@@ -45,7 +45,8 @@ bizuit-custom-plugin-sample/
 │   │   └── Features/
 │   │       ├── Items/                 # Feature ejemplo (CRUD público)
 │   │       ├── Products/              # Feature con autenticación
-│   │       └── AuditLogs/             # Feature sin transacción
+│   │       ├── AuditLogs/             # Feature sin transacción
+│   │       └── Me/                    # Endpoint debug (info usuario)
 │   └── DevHost/                       # Servidor de desarrollo local
 │       ├── DevHost.csproj
 │       ├── Program.cs
@@ -99,13 +100,14 @@ El archivo `plugin.json` define la metadata del plugin:
 
 ## Features de Ejemplo
 
-Este template incluye 3 features que demuestran diferentes patrones:
+Este template incluye 4 features que demuestran diferentes patrones:
 
 | Feature    | Endpoints       | Autenticación      | Transacciones    |
 |------------|-----------------|--------------------| -----------------|
 | Items      | CRUD completo   | Público            | Automáticas      |
 | Products   | CRUD completo   | Protegido + Roles  | Automáticas      |
 | AuditLogs  | POST solamente  | Público            | Sin transacción  |
+| Me         | GET solamente   | Protegido + Roles  | N/A (solo lectura) |
 
 ## Desarrollo Local (DevHost)
 
@@ -147,7 +149,7 @@ npm run dev
 npm run watch
 ```
 
-El servidor arranca en **http://localhost:5000** con Swagger UI en la raíz.
+El servidor arranca en **http://localhost:5001** con Swagger UI en la raíz.
 
 ### Características del DevHost
 
@@ -196,9 +198,33 @@ INSERT INTO Products (Name, Price) VALUES (@p0, @p1)
 
 #### Debugging con VS Code
 
+Para debuggear con VS Code, necesitás crear el archivo `.vscode/launch.json`:
+
+```json
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "DevHost",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "build",
+      "program": "${workspaceFolder}/src/DevHost/bin/Debug/net9.0/DevHost.dll",
+      "args": [],
+      "cwd": "${workspaceFolder}/src/DevHost",
+      "stopAtEntry": false,
+      "env": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      }
+    }
+  ]
+}
+```
+
+Luego:
 1. Abrir panel "Run and Debug" (Ctrl+Shift+D)
 2. Seleccionar perfil "DevHost"
-3. Press F5 para iniciar con debugger
+3. Presionar F5 para iniciar con debugger
 4. Colocar breakpoints en archivos .cs
 5. Hacer request y el debugger se detendrá
 
@@ -289,32 +315,13 @@ user.IsAuthenticated = true
 | `gestor` | `gestor-user` | Gestores                   | Operaciones de gestión, sin eliminación |
 | `user`   | `basic-user`  | *(ninguno)*                | Solo autenticado, sin permisos especiales |
 
-**Personalización de Roles:**
+**Personalización de Roles (Modo MOCK):**
 
-Podés modificar los roles en `DevHost/Program.cs` (línea ~224):
-
-```csharp
-private static List<string> GetRoles(string token)
-{
-    return token.ToLowerInvariant() switch
-    {
-        "admin" => new List<string> { "Administrators", "BizuitAdmins" },
-        "gestor" => new List<string> { "Gestores" },
-        "user" => new List<string>(),
-        _ => new List<string>()
-    };
-}
-```
-
-Podés agregar más tokens personalizados:
-```csharp
-"supervisor" => new List<string> { "Supervisores", "Gestores" },
-"auditor" => new List<string> { "Auditores" },
-```
+En modo MOCK (sin Dashboard connection), los roles están hardcodeados en `DevHost/Program.cs` dentro del `MockBearerAuthenticationHandler`. Si necesitás modificar los roles mock, buscá el método `GetRoles` en ese archivo.
 
 #### Uso en Swagger UI
 
-1. Abrir http://localhost:5000 (Swagger UI)
+1. Abrir http://localhost:5001 (Swagger UI)
 2. Click en botón **"Authorize"** (candado arriba a la derecha)
 3. Ingresar uno de los tokens: `admin`, `gestor`, o `user`
 4. Click **"Authorize"**
@@ -324,18 +331,18 @@ Podés agregar más tokens personalizados:
 
 ```bash
 # Sin autenticación → 401 Unauthorized
-curl http://localhost:5000/api/products
+curl http://localhost:5001/api/products
 
 # Con token "admin" → 200 OK (tiene rol "Administrators")
-curl http://localhost:5000/api/products \
+curl http://localhost:5001/api/products \
   -H "Authorization: Bearer admin"
 
 # Con token "user" → 403 Forbidden (no tiene roles necesarios)
-curl http://localhost:5000/api/products \
+curl http://localhost:5001/api/products \
   -H "Authorization: Bearer user"
 
 # Con token "gestor" → 200 OK si el endpoint permite "Gestores"
-curl http://localhost:5000/api/products \
+curl http://localhost:5001/api/products \
   -H "Authorization: Bearer gestor"
 ```
 
@@ -960,7 +967,8 @@ bizuit-custom-plugin-sample/
 │   │   └── Features/
 │   │       ├── Items/                 # Example feature (public CRUD)
 │   │       ├── Products/              # Feature with authentication
-│   │       └── AuditLogs/             # Feature without transaction
+│   │       ├── AuditLogs/             # Feature without transaction
+│   │       └── Me/                    # Debug endpoint (user info)
 │   └── DevHost/                       # Local development server
 │       ├── DevHost.csproj
 │       ├── Program.cs
@@ -1014,13 +1022,14 @@ The `plugin.json` file defines the plugin metadata:
 
 ## Example Features
 
-This template includes 3 features demonstrating different patterns:
+This template includes 4 features demonstrating different patterns:
 
 | Feature    | Endpoints     | Authentication    | Transactions    |
 |------------|---------------|-------------------| ----------------|
 | Items      | Full CRUD     | Public            | Automatic       |
 | Products   | Full CRUD     | Protected + Roles | Automatic       |
 | AuditLogs  | POST only     | Public            | No transaction  |
+| Me         | GET only      | Protected + Roles | N/A (read only) |
 
 ## Local Development (DevHost)
 
@@ -1062,7 +1071,7 @@ npm run dev
 npm run watch
 ```
 
-The server starts at **http://localhost:5000** with Swagger UI at the root.
+The server starts at **http://localhost:5001** with Swagger UI at the root.
 
 ### DevHost Features
 
@@ -1111,6 +1120,30 @@ INSERT INTO Products (Name, Price) VALUES (@p0, @p1)
 
 #### Debugging with VS Code
 
+To debug with VS Code, you need to create the `.vscode/launch.json` file:
+
+```json
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "DevHost",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "build",
+      "program": "${workspaceFolder}/src/DevHost/bin/Debug/net9.0/DevHost.dll",
+      "args": [],
+      "cwd": "${workspaceFolder}/src/DevHost",
+      "stopAtEntry": false,
+      "env": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      }
+    }
+  ]
+}
+```
+
+Then:
 1. Open "Run and Debug" panel (Ctrl+Shift+D)
 2. Select "DevHost" profile
 3. Press F5 to start with debugger
@@ -1204,32 +1237,13 @@ user.IsAuthenticated = true
 | `gestor` | `gestor-user` | Gestores                   | Management operations, no delete |
 | `user`   | `basic-user`  | *(none)*                   | Just authenticated, no special permissions |
 
-**Role Customization:**
+**Role Customization (MOCK Mode):**
 
-You can modify roles in `DevHost/Program.cs` (line ~224):
-
-```csharp
-private static List<string> GetRoles(string token)
-{
-    return token.ToLowerInvariant() switch
-    {
-        "admin" => new List<string> { "Administrators", "BizuitAdmins" },
-        "gestor" => new List<string> { "Gestores" },
-        "user" => new List<string>(),
-        _ => new List<string>()
-    };
-}
-```
-
-You can add more custom tokens:
-```csharp
-"supervisor" => new List<string> { "Supervisores", "Gestores" },
-"auditor" => new List<string> { "Auditores" },
-```
+In MOCK mode (without Dashboard connection), roles are hardcoded in `DevHost/Program.cs` inside the `MockBearerAuthenticationHandler`. If you need to modify mock roles, look for the `GetRoles` method in that file.
 
 #### Using in Swagger UI
 
-1. Open http://localhost:5000 (Swagger UI)
+1. Open http://localhost:5001 (Swagger UI)
 2. Click **"Authorize"** button (padlock icon top-right)
 3. Enter one of the tokens: `admin`, `gestor`, or `user`
 4. Click **"Authorize"**
@@ -1239,18 +1253,18 @@ You can add more custom tokens:
 
 ```bash
 # No authentication → 401 Unauthorized
-curl http://localhost:5000/api/products
+curl http://localhost:5001/api/products
 
 # With "admin" token → 200 OK (has "Administrators" role)
-curl http://localhost:5000/api/products \
+curl http://localhost:5001/api/products \
   -H "Authorization: Bearer admin"
 
 # With "user" token → 403 Forbidden (no required roles)
-curl http://localhost:5000/api/products \
+curl http://localhost:5001/api/products \
   -H "Authorization: Bearer user"
 
 # With "gestor" token → 200 OK if endpoint allows "Gestores"
-curl http://localhost:5000/api/products \
+curl http://localhost:5001/api/products \
   -H "Authorization: Bearer gestor"
 ```
 

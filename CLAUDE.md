@@ -249,7 +249,7 @@ Use `NoTransaction` for: logging/auditing, high-frequency writes, operations tha
 The DevHost provides a standalone server for testing with **mock authentication** that simulates Backend Host behavior:
 
 ```bash
-# Start development server (http://localhost:5000 + Swagger UI)
+# Start development server (http://localhost:5001 + Swagger UI)
 npm run dev
 
 # Hot reload during development
@@ -268,20 +268,20 @@ DevHost uses mock Bearer token authentication to simulate production behavior:
 **Testing with curl**:
 ```bash
 # No auth - Should fail with 403
-curl -X GET 'http://localhost:5000/api/products'
+curl -X GET 'http://localhost:5001/api/products'
 
 # Admin token - Should succeed
-curl -X GET 'http://localhost:5000/api/products' \
+curl -X GET 'http://localhost:5001/api/products' \
   -H 'Authorization: Bearer admin'
 
 # Gestor token - Can read/create, cannot delete
-curl -X GET 'http://localhost:5000/api/products' \
+curl -X GET 'http://localhost:5001/api/products' \
   -H 'Authorization: Bearer gestor'
 
-curl -X DELETE 'http://localhost:5000/api/products/1' \
+curl -X DELETE 'http://localhost:5001/api/products/1' \
   -H 'Authorization: Bearer gestor'  # 403 Forbidden
 
-curl -X DELETE 'http://localhost:5000/api/products/1' \
+curl -X DELETE 'http://localhost:5001/api/products/1' \
   -H 'Authorization: Bearer admin'   # 200 OK or 404
 ```
 
