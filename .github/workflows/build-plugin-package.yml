@@ -1,0 +1,211 @@
+name: Build Plugin Package
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'src/**'
+      - 'plugin.json'
+      - 'package.json'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Package version (leave empty to auto-increment)'
+        required: false
+        type: string
+
+jobs:
+  build-plugin-package:
+    name: Build Plugin ZIP
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install npm dependencies
+        run: npm install
+
+      - name: Get build metadata
+        id: build_metadata
+        run: |
+          COMMIT_HASH="${{ github.sha }}"
+          SHORT_HASH="${COMMIT_HASH:0:7}"
+          BUILD_DATE=$(date -u +"%Y-%m-%dT%H:%M:%S.000Z")
+
+          echo "commit_hash=$COMMIT_HASH" >> $GITHUB_OUTPUT
+          echo "short_hash=$SHORT_HASH" >> $GITHUB_OUTPUT
+          echo "build_date=$BUILD_DATE" >> $GITHUB_OUTPUT
+
+          echo "Commit: $SHORT_HASH"
+          echo "Build Date: $BUILD_DATE"
+
+      - name: Calculate version
+        id: version
+        run: |
+          # Pull latest changes to get version commits (they have [skip ci] so won't be in checkout)
+          git pull origin main --rebase || true
+
+          # Read current version from plugin.json (this is the source of truth)
+          CURRENT_VERSION=$(jq -r '.version' plugin.json)
+          echo "Current version in plugin.json: $CURRENT_VERSION"
+
+          # If manual version provided, use it
+          if [ -n "${{ github.event.inputs.version }}" ]; then
+            NEW_VERSION="${{ github.event.inputs.version }}"
+            echo "Using manual version: $NEW_VERSION"
+          else
+            # Validate current version format
+            if [ -z "$CURRENT_VERSION" ] || ! [[ "$CURRENT_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+              NEW_VERSION="1.0.0"
+              echo "Invalid or missing version! Starting at v1.0.0"
+            else
+              # Increment PATCH from current version
+              IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT_VERSION"
+              PATCH=$((PATCH + 1))
+              NEW_VERSION="$MAJOR.$MINOR.$PATCH"
+              echo "Auto-increment: $CURRENT_VERSION -> $NEW_VERSION"
+            fi
+          fi
+
+          echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
+
+          # Update plugin.json with new version
+          jq --arg version "$NEW_VERSION" '.version = $version' plugin.json > plugin.tmp.json
+          mv plugin.tmp.json plugin.json
+
+          echo "Updated plugin.json to version $NEW_VERSION"
+
+      - name: Read plugin metadata
+        id: plugin_meta
+        run: |
+          PLUGIN_NAME=$(jq -r '.name' plugin.json)
+          PLUGIN_DESC=$(jq -r '.description // "Backend plugin"' plugin.json)
+          PLUGIN_AUTHOR=$(jq -r '.author // "BIZUIT"' plugin.json)
+
+          # Derive project name from entryPoint (e.g., "MyPlugin.dll" -> "MyPlugin")
+          ENTRY_POINT=$(jq -r '.entryPoint' plugin.json)
+          PROJECT_NAME="${ENTRY_POINT%.dll}"
+
+          echo "name=$PLUGIN_NAME" >> $GITHUB_OUTPUT
+          echo "description=$PLUGIN_DESC" >> $GITHUB_OUTPUT
+          echo "author=$PLUGIN_AUTHOR" >> $GITHUB_OUTPUT
+          echo "project_name=$PROJECT_NAME" >> $GITHUB_OUTPUT
+
+          echo "Plugin: $PLUGIN_NAME"
+          echo "Project: $PROJECT_NAME"
+          echo "Description: $PLUGIN_DESC"
+
+      - name: Build and publish plugin
+        run: |
+          echo "Building plugin..."
+          dotnet publish src/${{ steps.plugin_meta.outputs.project_name }}/${{ steps.plugin_meta.outputs.project_name }}.csproj -c Release -o publish
+
+          echo "Build completed"
+          ls -la publish/
+
+      - name: Create ZIP package
+        id: create_zip
+        run: |
+          PLUGIN_NAME="${{ steps.plugin_meta.outputs.name }}"
+          VERSION="${{ steps.version.outputs.version }}"
+          SHORT_HASH="${{ steps.build_metadata.outputs.short_hash }}"
+
+          ZIP_NAME="${PLUGIN_NAME}.${VERSION}-${SHORT_HASH}.zip"
+
+          mkdir -p dist
+
+          # Create ZIP with published files + plugin.json
+          cd publish
+          cp ../plugin.json .
+          zip -r "../dist/${ZIP_NAME}" .
+          cd ..
+
+          echo "zip_name=$ZIP_NAME" >> $GITHUB_OUTPUT
+
+          echo "Created: dist/${ZIP_NAME}"
+          ls -la dist/
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.plugin_meta.outputs.name }}-${{ steps.version.outputs.version }}
+          path: dist/*.zip
+          retention-days: 90
+
+      - name: Commit version update
+        run: |
+          echo "📝 Committing version update..."
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git add plugin.json
+
+          if git diff --staged --quiet; then
+            echo "⚠️ No version changes to commit"
+          else
+            git commit -m "chore: bump version to ${{ steps.version.outputs.version }} [skip ci]"
+
+            echo "📤 Pushing changes to repository..."
+
+            if git push; then
+              echo "✅ Version update committed and pushed successfully"
+            else
+              echo "❌ Failed to push changes"
+              exit 1
+            fi
+          fi
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ steps.version.outputs.version }}
+          name: ${{ steps.plugin_meta.outputs.name }} v${{ steps.version.outputs.version }}
+          body: |
+            ## ${{ steps.plugin_meta.outputs.name }} v${{ steps.version.outputs.version }}
+
+            **Description**: ${{ steps.plugin_meta.outputs.description }}
+            **Author**: ${{ steps.plugin_meta.outputs.author }}
+
+            ### Build Info
+            - **Commit**: [`${{ steps.build_metadata.outputs.short_hash }}`](${{ github.server_url }}/${{ github.repository }}/commit/${{ steps.build_metadata.outputs.commit_hash }})
+            - **Build Date**: ${{ steps.build_metadata.outputs.build_date }}
+            - **Workflow Run**: [#${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+
+            ### Installation
+
+            1. Download `${{ steps.create_zip.outputs.zip_name }}`
+            2. Go to **Admin Panel > Plugins > Upload Plugin**
+            3. Upload the ZIP file
+            4. Configure connection string if needed
+            5. Activate the plugin
+
+            ### API Endpoints
+
+            Once activated, the plugin endpoints will be available at:
+            ```
+            /api/plugins/${{ steps.plugin_meta.outputs.name }}/*
+            ```
+
+            ---
+            Generated with GitHub Actions
+          files: |
+            dist/${{ steps.create_zip.outputs.zip_name }}
+          draft: false
+          prerelease: false

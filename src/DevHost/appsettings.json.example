@@ -1,0 +1,75 @@
+{
+  // =============================================================================
+  // Connection Strings - Database Configuration
+  // =============================================================================
+  "ConnectionStrings": {
+    // Default: Main database connection for plugin data (Items, Products, AuditLogs, etc.)
+    // Used by: All Features that require database access (Items, Products, etc.)
+    // Example: "Server=localhost;Database=MyPluginDB;User Id=sa;Password=YourPassword;TrustServerCertificate=True"
+    "Default": "Server=YOUR_SERVER;Database=YOUR_DATABASE;User Id=YOUR_USER;Password=YOUR_PASSWORD;TrustServerCertificate=True",
+
+    // Dashboard: BIZUIT Dashboard database for retrieving user roles and RoleSettings
+    // Used by: DashboardUserService to fetch roles from Users/Roles/RoleSettings tables
+    // Required: Always required - DevHost validates encrypted Dashboard tokens
+    // Tables used: Users, Roles, RoleSettings
+    // Authentication: DevHost decrypts encrypted Dashboard tokens OR accepts plain usernames
+    // Example: "Server=your-server.com;Database=YourDashboardDB;User Id=YourUser;Password=YourPassword;TrustServerCertificate=True"
+    "Dashboard": "Server=YOUR_DASHBOARD_SERVER;Database=YOUR_DASHBOARD_DATABASE;User Id=YOUR_USER;Password=YOUR_PASSWORD;TrustServerCertificate=True"
+  },
+
+  // =============================================================================
+  // DevHost Configuration
+  // =============================================================================
+  "DevHost": {
+    // EnableSqlLogging: Controls SQL query logging via DapperLoggingConnection middleware
+    // - true:  Logs all SQL queries executed through Dapper with:
+    //          • Complete query text
+    //          • Parameter values (be careful with sensitive data!)
+    //          • Execution time in milliseconds
+    //          • Rows affected or returned
+    //          Useful for: Debugging, performance tuning, query optimization, SQL injection prevention
+    //          Performance impact: Minimal (logging overhead only)
+    //          Example output: "[SQL] 45ms | 3 rows\nSELECT * FROM Items WHERE IsActive = @p0\nParameters: @p0=True"
+    //
+    // - false: No SQL query logging
+    //          Recommended for: Production environments
+    //
+    // Note: Also requires "DevHost.Middleware.DapperLoggingConnection": "Information" in Logging section below
+    "EnableSqlLogging": true
+  },
+
+  // =============================================================================
+  // Logging Configuration
+  // =============================================================================
+  "Logging": {
+    "LogLevel": {
+      // Default: Base log level for all categories not explicitly configured
+      // Options: Trace, Debug, Information, Warning, Error, Critical, None
+      // Information: Shows general application flow and important events
+      "Default": "Information",
+
+      // Microsoft.AspNetCore: Log level for ASP.NET Core framework logs
+      // Warning: Reduces noise from framework internals (request/response pipeline, routing, etc.)
+      // Use Information/Debug: To see detailed ASP.NET Core behavior
+      "Microsoft.AspNetCore": "Warning",
+
+      // DevHost.Middleware.DapperLoggingConnection: SQL query logging middleware
+      // Information: Shows all SQL queries when EnableSqlLogging=true
+      //              Displays query text, parameters, execution time, rows affected
+      // Warning/Error: Only shows SQL errors or warnings
+      // None: Disables SQL query logging completely
+      // Note: Must be "Information" to see SQL queries in console
+      "DevHost.Middleware.DapperLoggingConnection": "Information",
+
+      // DevHost.Middleware.ExceptionMiddleware: Exception handling middleware
+      // Information: Shows detailed exception information in Development mode:
+      //              • Full stack traces with line numbers
+      //              • Inner exceptions (nested errors)
+      //              • Request details (method, path, headers)
+      //              • Exception type and message
+      // Warning/Error: Only shows exception summaries
+      // Production behavior: Always returns generic error (regardless of log level)
+      "DevHost.Middleware.ExceptionMiddleware": "Information"
+    }
+  }
+}

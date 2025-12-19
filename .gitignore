@@ -1,0 +1,41 @@
+# Build outputs
+bin/
+obj/
+dist/
+*.dll
+*.pdb
+*.exe
+
+# NuGet
+*.nupkg
+*.snupkg
+
+# Visual Studio
+.vs/
+*.user
+*.suo
+*.cache
+
+# JetBrains Rider
+.idea/
+
+# VS Code
+.vscode/
+
+# Node.js
+node_modules/
+package-lock.json
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Test results
+TestResults/
+*.trx
+
+# Local environment
+.env
+.env.local
+*.local
+appsettings.Development.json

@@ -1,0 +1,9 @@
+{
+  "name": "myplugin",
+  "version": "1.0.0",
+  "description": "My custom backend plugin",
+  "author": "Your Name",
+  "entryPoint": "MyPlugin.dll",
+  "pluginClass": "MyPlugin.MyPluginPlugin",
+  "requiresDatabase": true
+}
