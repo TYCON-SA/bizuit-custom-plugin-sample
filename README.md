@@ -120,21 +120,18 @@ El proyecto incluye un DevHost para desarrollo y debug local sin necesidad del B
 ```json
 {
   "ConnectionStrings": {
-    "Default": "Server=TU_SERVIDOR;Database=TU_DATABASE;User Id=TU_USUARIO;Password=TU_PASSWORD;TrustServerCertificate=True",
-    "Dashboard": "Server=TU_SERVIDOR;Database=TU_DASHBOARD_DATABASE;User Id=TU_USUARIO;Password=TU_PASSWORD;TrustServerCertificate=True"
+    "Default": "Server=TU_SERVIDOR;Database=TU_DATABASE;User Id=TU_USUARIO;Password=TU_PASSWORD;TrustServerCertificate=True"
   },
   "DevHost": {
-    "UseMockRoleSettings": false
+    "EnableSqlLogging": false
   }
 }
 ```
 
 **Connection Strings:**
 - `Default`: Base de datos donde están las tablas de tu plugin (Items, Products, etc.)
-- `Dashboard` (opcional): Base de datos del Dashboard de BIZUIT para obtener roles y roleSettings REALES
 
 **Configuración:**
-- `UseMockRoleSettings`: Si es `true`, usa datos mock aunque tengas Dashboard connection (útil para testing offline)
 - `EnableSqlLogging`: Si es `true`, loguea todas las queries SQL con parámetros y tiempos (solo Development)
 
 2. Crear las tablas en la base de datos (ver [Setup de Base de Datos](#setup-de-base-de-datos))
@@ -157,8 +154,7 @@ El servidor arranca en **http://localhost:5001** con Swagger UI en la raíz.
 - ✅ Usa la misma lógica del plugin que en producción
 - ✅ Hot reload con `npm run watch`
 - ✅ Connection string configurable
-- ✅ **Autenticación con datos REALES** de Dashboard (roles y roleSettings)
-- ✅ Fallback a mock si no hay Dashboard connection
+- ✅ **Autenticación con JWT tokens reales** del Dashboard
 - ✅ Transacciones automáticas (POST/PUT/PATCH/DELETE con rollback automático en errores)
 - ✅ **[NUEVO]** Debug con VS Code (F5) con breakpoints funcionales
 - ✅ **[NUEVO]** Exception middleware con stack traces detallados en JSON
@@ -239,123 +235,49 @@ Luego:
 
 ### Autenticación del DevHost
 
-#### Dos Modos de Autenticación
+El DevHost usa **autenticación JWT real** igual que en producción. Necesitás obtener un token válido del Dashboard de BIZUIT.
 
-**1. Modo REAL (con Dashboard connection):**
-- Configurá `ConnectionStrings:Dashboard` apuntando a tu Dashboard DB
-- En Swagger, usá cualquier **username válido** como Bearer token (ej: `admin`, `jperez`)
-- DevHost consulta la DB y obtiene los roles y roleSettings REALES de ese usuario
-- Ideal para probar con datos de producción/staging
+#### Cómo Obtener un Token JWT
 
-**2. Modo MOCK (sin Dashboard connection):**
-- Si no configurás `Dashboard` connection string
-- Usá tokens predefinidos: `admin`, `gestor`, `user`
-- Roles y roleSettings son hardcodeados (ver tabla abajo)
-- Ideal para desarrollo rápido sin DB
-
-#### ¿Qué es la Autenticación del DevHost?
-
-**Autenticación del DevHost** = Autenticación **simplificada** para desarrollo local
-
-**El Problema en Producción:**
-
-En producción, el Backend Host usa autenticación JWT real y compleja:
-1. Usuario hace login → recibe token JWT complejo (200+ caracteres)
-2. Token tiene firma criptográfica, expiración, claims cifrados
-3. Servidor valida firma, verifica expiración, extrae roles
-4. **Requiere infraestructura**: Azure AD, base de usuarios, certificados, etc.
-
-Ejemplo de token JWT real:
-```
-eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c
-```
-
-**La Solución para DevHost:**
-
-Para desarrollo LOCAL, necesitamos algo **simple** pero **realista**:
-- Tokens simples de texto plano: `"admin"`, `"gestor"`, `"user"`
-- Mapeo directo a roles sin criptografía
-- Sin necesidad de Azure AD o infraestructura externa
-- Se comporta **igual** que autenticación real desde el punto de vista del plugin
-
-#### Cómo Funciona
-
-El `MockBearerAuthenticationHandler` simula el proceso completo:
-
-```csharp
-// 1. Recibe el header Authorization
-Authorization: Bearer admin
-
-// 2. Extrae el token simple
-token = "admin"
-
-// 3. Mapea a roles según tabla hardcodeada
-"admin"  → Roles: ["Administrators", "BizuitAdmins"]
-"gestor" → Roles: ["Gestores"]
-"user"   → Roles: [] (sin roles, solo autenticado)
-
-// 4. Crea Claims (como lo haría JWT real)
-Claims:
-  - NameIdentifier: "admin-001"
-  - Name: "admin-user"
-  - Role: "Administrators"
-  - Role: "BizuitAdmins"
-
-// 5. BizuitUserContext se puebla desde estos Claims
-user.Username = "admin-user"
-user.Roles = ["Administrators", "BizuitAdmins"]
-user.IsAuthenticated = true
-```
-
-#### Tokens Disponibles
-
-| Token    | Usuario       | Roles                      | Descripción |
-|----------|---------------|----------------------------|-------------|
-| `admin`  | `admin-user`  | Administrators, BizuitAdmins | Acceso completo a todas las operaciones |
-| `gestor` | `gestor-user` | Gestores                   | Operaciones de gestión, sin eliminación |
-| `user`   | `basic-user`  | *(ninguno)*                | Solo autenticado, sin permisos especiales |
-
-**Personalización de Roles (Modo MOCK):**
-
-En modo MOCK (sin Dashboard connection), los roles están hardcodeados en `DevHost/Program.cs` dentro del `MockBearerAuthenticationHandler`. Si necesitás modificar los roles mock, buscá el método `GetRoles` en ese archivo.
+1. **Login al Dashboard**: Ingresá a tu Dashboard de BIZUIT (ej: `https://test.bizuit.com/arielschbizuitdashboard`)
+2. **Abrir Developer Tools**: Presioná F12 en tu navegador
+3. **Ir a Storage**:
+   - Chrome/Edge: Application → Local Storage
+   - Firefox: Storage → Local Storage
+4. **Copiar el Token**: Buscá la clave `adminSessionToken` y copiá su valor completo
+5. **Usar en DevHost**: Pegá este token en Swagger UI o en tus requests de curl
 
 #### Uso en Swagger UI
 
 1. Abrir http://localhost:5001 (Swagger UI)
 2. Click en botón **"Authorize"** (candado arriba a la derecha)
-3. Ingresar uno de los tokens: `admin`, `gestor`, o `user`
+3. Pegar tu token JWT completo del Dashboard
 4. Click **"Authorize"**
-5. Los endpoints protegidos ahora funcionarán según tus roles
+5. Los endpoints protegidos ahora funcionarán con tus roles reales
 
 #### Uso con curl
 
 ```bash
-# Sin autenticación → 401 Unauthorized
-curl http://localhost:5001/api/products
+# Obtener tu token del Dashboard primero
+TOKEN="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6ImFkbWluIiwiYml6dWl0X3Rva2VuIjoiWk1kdWZX..."
 
-# Con token "admin" → 200 OK (tiene rol "Administrators")
+# Usar el token en requests
 curl http://localhost:5001/api/products \
-  -H "Authorization: Bearer admin"
+  -H "Authorization: Bearer $TOKEN"
 
-# Con token "user" → 403 Forbidden (no tiene roles necesarios)
-curl http://localhost:5001/api/products \
-  -H "Authorization: Bearer user"
-
-# Con token "gestor" → 200 OK si el endpoint permite "Gestores"
-curl http://localhost:5001/api/products \
-  -H "Authorization: Bearer gestor"
+# El token contiene tus roles y roleSettings reales
+curl http://localhost:5001/api/me \
+  -H "Authorization: Bearer $TOKEN"
 ```
 
-#### Por Qué es Útil
+#### Ventajas de Usar Tokens Reales
 
-✅ **Fácil de usar**: Solo escribir "admin" en lugar de token JWT de 200 caracteres
-✅ **Realista**: Se comporta exactamente igual que JWT real
-✅ **Sin infraestructura**: No necesita Azure AD, base de datos de usuarios, certificados
-✅ **Múltiples roles**: Probar diferentes escenarios (admin, gestor, user)
-✅ **Desarrollo rápido**: Cambiar de usuario solo cambiando el token
-✅ **Debugging fácil**: Ver exactamente qué roles tiene cada usuario
+✅ **Datos Reales**: Probás con tus roles y roleSettings exactos de producción
+✅ **Realista**: El comportamiento es idéntico al Backend Host en producción
+✅ **Sin Mocks**: No hay datos hardcodeados, todo viene de la DB
+✅ **Debugging Preciso**: Ves exactamente cómo se comportará tu plugin con usuarios reales
 
-⚠️ **Solo para desarrollo**: En producción, el Backend Host usa JWT real con validación criptográfica
+⚠️ **Importante**: Los tokens tienen expiración. Si tu token expira, necesitás obtener uno nuevo del Dashboard.
 
 ## Setup de Base de Datos
 
@@ -1042,21 +964,18 @@ The project includes a DevHost for local development and debugging without needi
 ```json
 {
   "ConnectionStrings": {
-    "Default": "Server=YOUR_SERVER;Database=YOUR_DATABASE;User Id=YOUR_USER;Password=YOUR_PASSWORD;TrustServerCertificate=True",
-    "Dashboard": "Server=YOUR_SERVER;Database=YOUR_DASHBOARD_DATABASE;User Id=YOUR_USER;Password=YOUR_PASSWORD;TrustServerCertificate=True"
+    "Default": "Server=YOUR_SERVER;Database=YOUR_DATABASE;User Id=YOUR_USER;Password=YOUR_PASSWORD;TrustServerCertificate=True"
   },
   "DevHost": {
-    "UseMockRoleSettings": false
+    "EnableSqlLogging": false
   }
 }
 ```
 
 **Connection Strings:**
 - `Default`: Database where your plugin tables live (Items, Products, etc.)
-- `Dashboard` (optional): BIZUIT Dashboard database for REAL roles and roleSettings
 
 **Configuration:**
-- `UseMockRoleSettings`: If `true`, uses mock data even with Dashboard connection (useful for offline testing)
 - `EnableSqlLogging`: If `true`, logs all SQL queries with parameters and execution times (Development only)
 
 2. Create the tables in the database (see [Database Setup](#database-setup))
@@ -1079,8 +998,7 @@ The server starts at **http://localhost:5001** with Swagger UI at the root.
 - ✅ Uses the same plugin logic as in production
 - ✅ Hot reload with `npm run watch`
 - ✅ Configurable connection string
-- ✅ **REAL authentication data** from Dashboard (roles and roleSettings)
-- ✅ Fallback to mock if no Dashboard connection
+- ✅ **Real JWT token authentication** from Dashboard
 - ✅ Automatic transactions (POST/PUT/PATCH/DELETE with automatic rollback on errors)
 - ✅ **[NEW]** Debug with VS Code (F5) with working breakpoints
 - ✅ **[NEW]** Exception middleware with detailed stack traces in JSON
@@ -1161,123 +1079,49 @@ Then:
 
 ### DevHost Authentication
 
-#### Two Authentication Modes
+DevHost uses **real JWT token authentication** just like in production. You need to obtain a valid token from the BIZUIT Dashboard.
 
-**1. REAL Mode (with Dashboard connection):**
-- Configure `ConnectionStrings:Dashboard` pointing to your Dashboard DB
-- In Swagger, use any **valid username** as Bearer token (e.g., `admin`, `jperez`)
-- DevHost queries the DB and gets the REAL roles and roleSettings for that user
-- Ideal for testing with production/staging data
+#### How to Get a JWT Token
 
-**2. MOCK Mode (without Dashboard connection):**
-- If you don't configure `Dashboard` connection string
-- Use predefined tokens: `admin`, `gestor`, `user`
-- Roles and roleSettings are hardcoded (see table below)
-- Ideal for fast development without DB
-
-#### What is DevHost Authentication?
-
-**Mock Authentication** = **Fake/simulated** authentication for development only
-
-**The Problem in Production:**
-
-In production, Backend Host uses real, complex JWT authentication:
-1. User logs in → receives complex JWT token (200+ characters)
-2. Token has cryptographic signature, expiration, encrypted claims
-3. Server validates signature, verifies expiration, extracts roles
-4. **Requires infrastructure**: Azure AD, user database, certificates, etc.
-
-Example of real JWT token:
-```
-eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c
-```
-
-**The Solution for DevHost:**
-
-For LOCAL development, we need something **simple** but **realistic**:
-- Simple plain-text tokens: `"admin"`, `"gestor"`, `"user"`
-- Direct role mapping without cryptography
-- No need for Azure AD or external infrastructure
-- Behaves **exactly** like real auth from the plugin's perspective
-
-#### How It Works
-
-The `MockBearerAuthenticationHandler` simulates the complete process:
-
-```csharp
-// 1. Receives Authorization header
-Authorization: Bearer admin
-
-// 2. Extracts simple token
-token = "admin"
-
-// 3. Maps to roles via hardcoded table
-"admin"  → Roles: ["Administrators", "BizuitAdmins"]
-"gestor" → Roles: ["Gestores"]
-"user"   → Roles: [] (no roles, just authenticated)
-
-// 4. Creates Claims (just like real JWT would)
-Claims:
-  - NameIdentifier: "admin-001"
-  - Name: "admin-user"
-  - Role: "Administrators"
-  - Role: "BizuitAdmins"
-
-// 5. BizuitUserContext is populated from these Claims
-user.Username = "admin-user"
-user.Roles = ["Administrators", "BizuitAdmins"]
-user.IsAuthenticated = true
-```
-
-#### Available Tokens
-
-| Token    | Username      | Roles                      | Description |
-|----------|---------------|----------------------------|-------------|
-| `admin`  | `admin-user`  | Administrators, BizuitAdmins | Full access to all operations |
-| `gestor` | `gestor-user` | Gestores                   | Management operations, no delete |
-| `user`   | `basic-user`  | *(none)*                   | Just authenticated, no special permissions |
-
-**Role Customization (MOCK Mode):**
-
-In MOCK mode (without Dashboard connection), roles are hardcoded in `DevHost/Program.cs` inside the `MockBearerAuthenticationHandler`. If you need to modify mock roles, look for the `GetRoles` method in that file.
+1. **Login to Dashboard**: Access your BIZUIT Dashboard (e.g., `https://test.bizuit.com/arielschbizuitdashboard`)
+2. **Open Developer Tools**: Press F12 in your browser
+3. **Go to Storage**:
+   - Chrome/Edge: Application → Local Storage
+   - Firefox: Storage → Local Storage
+4. **Copy the Token**: Find the `adminSessionToken` key and copy its complete value
+5. **Use in DevHost**: Paste this token in Swagger UI or your curl commands
 
 #### Using in Swagger UI
 
 1. Open http://localhost:5001 (Swagger UI)
 2. Click **"Authorize"** button (padlock icon top-right)
-3. Enter one of the tokens: `admin`, `gestor`, or `user`
+3. Paste your complete JWT token from Dashboard
 4. Click **"Authorize"**
-5. Protected endpoints will now work according to your roles
+5. Protected endpoints will now work with your real roles
 
 #### Using with curl
 
 ```bash
-# No authentication → 401 Unauthorized
-curl http://localhost:5001/api/products
+# Get your token from Dashboard first
+TOKEN="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6ImFkbWluIiwiYml6dWl0X3Rva2VuIjoiWk1kdWZX..."
 
-# With "admin" token → 200 OK (has "Administrators" role)
+# Use the token in requests
 curl http://localhost:5001/api/products \
-  -H "Authorization: Bearer admin"
+  -H "Authorization: Bearer $TOKEN"
 
-# With "user" token → 403 Forbidden (no required roles)
-curl http://localhost:5001/api/products \
-  -H "Authorization: Bearer user"
-
-# With "gestor" token → 200 OK if endpoint allows "Gestores"
-curl http://localhost:5001/api/products \
-  -H "Authorization: Bearer gestor"
+# The token contains your actual roles and roleSettings
+curl http://localhost:5001/api/me \
+  -H "Authorization: Bearer $TOKEN"
 ```
 
-#### Why It's Useful
+#### Benefits of Using Real Tokens
 
-✅ **Easy to use**: Just type "admin" instead of 200-character JWT token
-✅ **Realistic**: Behaves exactly like real JWT
-✅ **No infrastructure**: No Azure AD, user database, or certificates needed
-✅ **Multiple roles**: Test different scenarios (admin, gestor, user)
-✅ **Fast development**: Switch users by just changing token
-✅ **Easy debugging**: See exactly what roles each user has
+✅ **Real Data**: Test with your exact roles and roleSettings from production
+✅ **Realistic**: Behavior is identical to Backend Host in production
+✅ **No Mocks**: No hardcoded data, everything comes from the DB
+✅ **Accurate Debugging**: See exactly how your plugin will behave with real users
 
-⚠️ **Development only**: In production, Backend Host uses real JWT with cryptographic validation
+⚠️ **Important**: Tokens have expiration. If your token expires, you need to get a new one from Dashboard.
 
 ## Database Setup
 
