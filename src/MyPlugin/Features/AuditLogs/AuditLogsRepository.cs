@@ -15,7 +15,7 @@ public class AuditLogsRepository : SafeRepository<AuditLog>
     protected override string TableName => "AuditLogs";
 
     public AuditLogsRepository(IConnectionFactory connectionFactory)
-        : base(connectionFactory.CreateConnection())
+        : base(connectionFactory)
     {
     }
 

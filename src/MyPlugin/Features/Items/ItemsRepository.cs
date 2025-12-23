@@ -13,7 +13,7 @@ public class ItemsRepository : SafeRepository<Item>
     protected override string TableName => "Items";
 
     public ItemsRepository(IConnectionFactory connectionFactory)
-        : base(connectionFactory.CreateConnection())
+        : base(connectionFactory)
     {
     }
 

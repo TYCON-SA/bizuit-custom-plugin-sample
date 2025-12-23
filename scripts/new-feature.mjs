@@ -213,7 +213,7 @@ public class ${name}Repository : SafeRepository<Models.${singular}>
     protected override string TableName => "${name}";
 
     public ${name}Repository(IConnectionFactory connectionFactory)
-        : base(connectionFactory.CreateConnection())
+        : base(connectionFactory)
     {
     }
 

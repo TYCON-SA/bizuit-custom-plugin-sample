@@ -18,7 +18,7 @@ public class ProductsRepository : SafeRepository<Product>
     protected override string TableName => "Products";
 
     public ProductsRepository(IConnectionFactory connectionFactory)
-        : base(connectionFactory.CreateConnection())
+        : base(connectionFactory)
     {
     }
 
