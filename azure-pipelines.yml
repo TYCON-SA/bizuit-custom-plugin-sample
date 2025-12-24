@@ -115,14 +115,40 @@ stages:
               PLUGIN_NAME="$(pluginName)"
               VERSION="$(pluginVersion)"
               SHORT_HASH="$(shortHash)"
+              COMMIT_HASH="$(commitHash)"
+              BUILD_DATE="$(buildDate)"
 
               ZIP_NAME="${PLUGIN_NAME}.${VERSION}-${SHORT_HASH}.zip"
 
               mkdir -p dist
 
-              # Create ZIP with published files + plugin.json
+              # Get release notes from git commit message
+              RELEASE_NOTES=$(git log -1 --pretty=%B)
+
+              # Get repository URL from git remote
+              REPO_URL=$(git remote get-url origin 2>/dev/null | sed 's/\.git$//' || echo "")
+
+              # Build URL for Azure DevOps
+              BUILD_URL="$(System.CollectionUri)$(System.TeamProject)/_build/results?buildId=$(Build.BuildId)"
+
+              echo "Adding metadata to plugin.json:"
+              echo "  - commitHash: $SHORT_HASH"
+              echo "  - buildDate: $BUILD_DATE"
+              echo "  - buildUrl: $BUILD_URL"
+              echo "  - repositoryUrl: $REPO_URL"
+
+              # Enrich plugin.json with all metadata
+              jq --arg commitHash "$COMMIT_HASH" \
+                 --arg buildDate "$BUILD_DATE" \
+                 --arg releaseNotes "$RELEASE_NOTES" \
+                 --arg repositoryUrl "$REPO_URL" \
+                 --arg buildUrl "$BUILD_URL" \
+                 '. + {commitHash: $commitHash, buildDate: $buildDate, releaseNotes: $releaseNotes, repositoryUrl: $repositoryUrl, buildUrl: $buildUrl}' \
+                 plugin.json > plugin.enriched.json
+
+              # Create ZIP with published files + enriched plugin.json
               cd publish
-              cp ../plugin.json .
+              cp ../plugin.enriched.json ./plugin.json
               zip -r "../dist/${ZIP_NAME}" .
               cd ..
 
@@ -130,7 +156,7 @@ stages:
 
               echo "Created: dist/${ZIP_NAME}"
               ls -la dist/
-            displayName: 'Create ZIP package'
+            displayName: 'Create ZIP package with metadata'
 
           - task: PublishPipelineArtifact@1
             displayName: 'Publish artifact'
@@ -182,9 +208,14 @@ stages:
               echo "Commit: $(shortHash)"
               echo "Build Date: $(buildDate)"
               echo ""
-              echo "Artifacts:"
-              echo "  - $(zipName)"
-              echo "  - $(zipNameWithHash)"
+              echo "Artifact: $(zipName)"
+              echo ""
+              echo "Metadata included:"
+              echo "  - commitHash: $(shortHash)"
+              echo "  - buildDate: $(buildDate)"
+              echo "  - releaseNotes: (from commit message)"
+              echo "  - buildUrl: (Azure DevOps build link)"
+              echo "  - repositoryUrl: (from git remote)"
               echo ""
               echo "Installation:"
               echo "  1. Download artifact from this pipeline"
