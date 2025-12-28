@@ -1,0 +1,67 @@
+{
+  // =============================================================================
+  // Development Configuration Example
+  // =============================================================================
+  // This file shows how to configure the DevHost for local development.
+  // Copy this file to appsettings.Development.json and fill in your values.
+  // appsettings.Development.json is gitignored to prevent committing credentials.
+
+  "ConnectionStrings": {
+    // Default: Your plugin's database
+    "Default": "Server=localhost;Database=MyPluginDB;User Id=sa;Password=YourPassword;TrustServerCertificate=True",
+
+    // Dashboard: BIZUIT Dashboard database (for roles/roleSettings)
+    "Dashboard": "Server=localhost;Database=DashboardDB;User Id=sa;Password=YourPassword;TrustServerCertificate=True"
+  },
+
+  // =============================================================================
+  // System Configuration (matches production Backend Host)
+  // =============================================================================
+  "System": {
+    // DashboardApiUrl: URL of your BIZUIT Dashboard API
+    // Example: "https://test.bizuit.com/YOUR_TENANT_API/api"
+    "DashboardApiUrl": "https://YOUR_DASHBOARD_URL/YOUR_TENANT_API/api",
+
+    // TenantId: Your tenant identifier
+    "TenantId": "default"
+  },
+
+  // =============================================================================
+  // Custom Plugin Settings (Examples for Testing)
+  // =============================================================================
+  // These are CUSTOM settings that your plugin code accesses via IConfiguration.
+  // In production, these are configured via Admin UI in BackendPluginConfig table.
+  // In DevHost, you can set them here for local testing.
+  //
+  // Access in plugin: var url = configuration["AzureStorageUrl"];
+
+  // Example: Azure Storage for audio/file uploads
+  "AzureStorageUrl": "https://YOUR_STORAGE_ACCOUNT.blob.core.windows.net",
+  "AzureStorageKey": "YOUR_STORAGE_KEY_HERE",
+  "ContainerName": "audios",
+
+  // Example: External API integration
+  "ExternalApiUrl": "https://api.example.com/v1",
+  "ApiKey": "sk-abc123...",
+
+  // Example: Feature flags and limits
+  "MaxRetries": "5",
+  "TimeoutSeconds": "30",
+  "EnableDebugLogs": "true",
+
+  // =============================================================================
+  // DevHost Configuration
+  // =============================================================================
+  "DevHost": {
+    "EnableSqlLogging": true
+  },
+
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning",
+      "DevHost.Middleware.DapperLoggingConnection": "Information",
+      "DevHost.Middleware.ExceptionMiddleware": "Information"
+    }
+  }
+}

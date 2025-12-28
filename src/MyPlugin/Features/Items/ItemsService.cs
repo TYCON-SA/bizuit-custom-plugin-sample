@@ -118,4 +118,44 @@ public class ItemsService
             throw new InvalidOperationException($"Failed to call Dashboard API endpoint '{endpoint}': {ex.Message}", ex);
         }
     }
+
+    /// <summary>
+    /// EXAMPLE: Using custom plugin settings for external service configuration.
+    /// This demonstrates how to access settings configured by admin in the UI.
+    /// Settings are stored in BackendPluginConfig table and loaded into IConfiguration.
+    /// </summary>
+    /// <param name="data">File data to upload</param>
+    /// <param name="fileName">Name of the file</param>
+    /// <returns>URL of uploaded file</returns>
+    public async Task<string> UploadToExternalStorageAsync(byte[] data, string fileName)
+    {
+        // Access custom settings configured by admin
+        var storageUrl = _config["AzureStorageUrl"];
+        var storageKey = _config["AzureStorageKey"];
+        var containerName = _config.GetValue("ContainerName", "files");
+
+        // Validate required settings
+        if (string.IsNullOrEmpty(storageUrl))
+        {
+            throw new InvalidOperationException(
+                "AzureStorageUrl setting not configured. " +
+                "Please configure it in Admin UI: /admin/settings/plugins → Configuration section");
+        }
+
+        if (string.IsNullOrEmpty(storageKey))
+        {
+            throw new InvalidOperationException(
+                "AzureStorageKey setting not configured and marked as encrypted.");
+        }
+
+        // Use the configured settings
+        // In real implementation, you would use Azure.Storage.Blobs package
+        var uploadUrl = $"{storageUrl}/{containerName}/{fileName}";
+
+        // Simulated upload logic
+        // var blobClient = new BlobServiceClient(storageUrl, new StorageSharedKeyCredential(accountName, storageKey));
+        // await blobClient.UploadBlobAsync(containerName, fileName, new BinaryData(data));
+
+        return uploadUrl;
+    }
 }

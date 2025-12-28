@@ -1841,6 +1841,221 @@ public async Task TriggerProcessAsync(BizuitUserContext user, string processName
 }
 ```
 
+## Custom Plugin Settings
+
+Configure runtime settings via Admin UI without hardcoding values in your plugin code.
+
+### What Are Plugin Settings?
+
+Plugin Settings are **custom key-value configurations** stored in the `BackendPluginConfig` database table. They allow you to store values that shouldn't be hardcoded:
+
+- 🌐 External service URLs (Azure Storage, S3, webhooks)
+- 🔑 API keys and credentials (stored encrypted)
+- 🚩 Feature flags (enable/disable features)
+- ⚙️ Configurable limits (max retries, timeouts, page sizes)
+- 🏢 Environment-specific values (different per deployment)
+
+### When to Use Settings vs Hardcoded Values
+
+**✅ Use Settings for:**
+- External URLs that vary per environment
+- API keys and credentials
+- Business rules that may change (thresholds, limits)
+- Feature toggles
+- Values that differ between test/production
+
+**❌ Keep Hardcoded in Code:**
+- Business logic and algorithms
+- Database table names
+- Endpoint paths
+- Fixed constants that never change
+
+### Accessing Settings in Plugin Code
+
+Settings are automatically loaded into `IConfiguration` when the plugin starts. Access them using standard .NET configuration patterns:
+
+**Example: Azure Storage for Audio Files**
+
+```csharp
+using Microsoft.Extensions.Configuration;
+
+public class AudioService
+{
+    private readonly IConfiguration _config;
+    private readonly ILogger<AudioService> _logger;
+
+    public AudioService(IConfiguration config, ILogger<AudioService> logger)
+    {
+        _config = config;
+        _logger = logger;
+    }
+
+    public async Task<string> UploadAudioAsync(byte[] audioData, string fileName)
+    {
+        // Access custom settings
+        var storageUrl = _config["AzureStorageUrl"];
+        var storageKey = _config["AzureStorageKey"];
+        var containerName = _config.GetValue("ContainerName", "audios");  // With default
+
+        // Validate required settings
+        if (string.IsNullOrEmpty(storageUrl))
+        {
+            _logger.LogError("AzureStorageUrl not configured");
+            throw new InvalidOperationException(
+                "AzureStorageUrl not configured. " +
+                "Please configure it in Admin UI: /admin/settings/plugins");
+        }
+
+        // Use settings
+        var blobUrl = $"{storageUrl}/{containerName}/{fileName}";
+        // ... upload logic
+        return blobUrl;
+    }
+
+    public int GetMaxRetries()
+    {
+        // Access with default value
+        return _config.GetValue<int>("MaxRetries", 3);
+    }
+
+    public bool IsDebugEnabled()
+    {
+        // Access boolean setting
+        return _config.GetValue<bool>("EnableDebugLogs", false);
+    }
+}
+```
+
+### Configuring Settings in Admin UI
+
+**Production - Via Admin Panel:**
+
+1. Navigate to `/admin/settings/plugins`
+2. Click on your plugin
+3. Scroll to "Configuration" section
+4. Click "Add Config" button
+5. Enter your settings:
+
+| Key | Value | Encrypted |
+|-----|-------|-----------|
+| `AzureStorageUrl` | `https://YOUR_ACCOUNT.blob.core.windows.net/audios` | ☐ No |
+| `AzureStorageKey` | `your-secret-access-key` | ☑️ **Yes** |
+| `ContainerName` | `audios` | ☐ No |
+| `MaxRetries` | `5` | ☐ No |
+
+6. Click "Save Config"
+7. Click "Reload Plugin" to apply changes
+
+**⚠️ Important:** Settings marked as "Encrypted" are stored encrypted in the database using AES encryption. Always encrypt:
+- API keys
+- Passwords
+- Access tokens
+- Any sensitive credentials
+
+### Local Development - DevHost Configuration
+
+For local testing, configure settings in `src/DevHost/appsettings.Development.json`:
+
+```json
+{
+  "ConnectionStrings": {
+    "Default": "Server=localhost;Database=MyPluginDB;...",
+    "Dashboard": "Server=localhost;Database=DashboardDB;..."
+  },
+  "System": {
+    "DashboardApiUrl": "https://YOUR_DASHBOARD_URL/api",
+    "TenantId": "default"
+  },
+
+  // Custom Plugin Settings (for local testing)
+  "AzureStorageUrl": "https://YOUR_ACCOUNT.blob.core.windows.net",
+  "AzureStorageKey": "YOUR_LOCAL_KEY",
+  "ContainerName": "test-audios",
+  "MaxRetries": "3",
+  "EnableDebugLogs": "true"
+}
+```
+
+**📄 Example file:** See `src/DevHost/appsettings.Development.json.example` for a complete template.
+
+**🔒 Security:** Never commit `appsettings.Development.json` - it's already in `.gitignore`.
+
+### Common Settings Examples
+
+| Setting Key | Example Value | Encrypted | Use Case |
+|-------------|---------------|-----------|----------|
+| `AzureStorageUrl` | `https://storage.blob.core.windows.net/files` | No | External file storage URL |
+| `AzureStorageKey` | `abc123...` | **Yes** | Storage account access key |
+| `WebhookUrl` | `https://api.example.com/webhook` | No | Webhook callback endpoint |
+| `ApiKey` | `Bearer sk-xyz...` | **Yes** | External API authentication |
+| `MaxRetries` | `5` | No | Retry limit for external API calls |
+| `TimeoutSeconds` | `30` | No | HTTP client timeout |
+| `EnableDebugLogs` | `true` | No | Feature flag for debug logging |
+| `S3BucketName` | `my-bucket` | No | AWS S3 bucket name |
+| `SmtpHost` | `smtp.example.com` | No | Email server hostname |
+| `SmtpPassword` | `password123` | **Yes** | SMTP authentication |
+
+### Best Practices
+
+**1. Always Validate Settings:**
+```csharp
+var url = _config["ExternalApiUrl"];
+if (string.IsNullOrEmpty(url))
+{
+    _logger.LogError("ExternalApiUrl not configured");
+    throw new InvalidOperationException("ExternalApiUrl must be configured");
+}
+```
+
+**2. Use Default Values for Optional Settings:**
+```csharp
+var maxRetries = _config.GetValue<int>("MaxRetries", 3);
+var timeout = _config.GetValue<TimeSpan>("Timeout", TimeSpan.FromSeconds(30));
+var enabled = _config.GetValue<bool>("EnableFeature", false);
+```
+
+**3. Log Missing Required Settings:**
+```csharp
+public void ConfigureServices(IServiceCollection services, IConfiguration configuration)
+{
+    var apiKey = configuration["ExternalApiKey"];
+    if (string.IsNullOrEmpty(apiKey))
+    {
+        Console.WriteLine("⚠️  WARNING: ExternalApiKey not configured - external integration disabled");
+    }
+}
+```
+
+**4. Document Required Settings:**
+Always document in your plugin's README which settings are required vs optional, with examples.
+
+**5. Use Encrypted for Sensitive Data:**
+- ✅ API keys → Encrypted
+- ✅ Passwords → Encrypted
+- ✅ Access tokens → Encrypted
+- ❌ Public URLs → NOT encrypted
+- ❌ Feature flags → NOT encrypted
+
+### Settings vs System Configuration
+
+**System Configuration (`System:*`):**
+- Injected automatically by Backend Host
+- Read-only for your plugin
+- Same for all plugins (DashboardApiUrl, TenantId)
+
+**Custom Settings (your own keys):**
+- Defined by you (the plugin developer)
+- Configured by admin in UI
+- Specific to your plugin's needs
+
+```csharp
+// System config (read-only, injected by host)
+var dashboardUrl = configuration["System:DashboardApiUrl"];
+
+// Custom settings (configurable by admin)
+var storageUrl = configuration["AzureStorageUrl"];
+```
+
 ## Troubleshooting
 
 ### Error: "Table does not exist"
