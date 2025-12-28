@@ -1,0 +1,50 @@
+{
+  // =============================================================================
+  // Local Development Plugin Manifest
+  // =============================================================================
+  // Copy this file to plugin.local.json and fill in your real values.
+  // plugin.local.json is gitignored - safe to put credentials here for local testing.
+  //
+  // For CI/CD deployment, copy plugin.json.example to plugin.json instead.
+
+  "name": "myplugin",
+  "version": "1.0.8",
+  "description": "My custom backend plugin",
+  "author": "Your Name",
+  "entryPoint": "MyPlugin.dll",
+  "pluginClass": "MyPlugin.MyPluginPlugin",
+  "requiresDatabase": true,
+
+  // =============================================================================
+  // Default Settings - FOR LOCAL DEVELOPMENT
+  // =============================================================================
+  // Put REAL VALUES here for local testing with DevHost.
+  // These values are used when you run: npm run package
+  //
+  // ✅ Safe to include real values - file is gitignored
+  // ✅ Used by DevHost when plugin loads locally
+  // ✅ Makes local development easier (no manual config needed)
+
+  "defaultSettings": {
+    // External service configuration (REAL VALUES for local testing)
+    "ExternalApiUrl": "https://test-api.yourcompany.com/v1",
+    "ApiKey": "your-real-test-api-key-here",
+    "AzureStorageUrl": "https://yourtestaccount.blob.core.windows.net",
+    "AzureStorageKey": "your-real-storage-key-here",
+
+    // Feature flags
+    "EnableDebugLogs": "true",   // Enable for local debugging
+    "EnableCaching": "true",
+    "EnableNotifications": "false",
+
+    // Limits and timeouts
+    "MaxItemsPerPage": "50",
+    "MaxRetries": "5",
+    "TimeoutSeconds": "60",      // Longer timeout for debugging
+    "CacheTimeoutSeconds": "300",
+
+    // Business rules
+    "DefaultCurrency": "USD",
+    "DefaultLanguage": "en"
+  }
+}

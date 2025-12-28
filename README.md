@@ -18,20 +18,144 @@ cd mi-plugin
 # 2. Instalar dependencias de scripts
 npm install
 
-# 3. Renombrar el plugin
-#    - Editar plugin.json (name, displayName, description)
+# 3. Configurar plugin manifest
+#    Para desarrollo LOCAL con valores reales:
+cp plugin.local.json.example plugin.local.json
+#    Editar plugin.local.json con tus valores reales (gitignored - safe)
+
+#    Para CI/CD (deployment):
+#    El pipeline usa plugin.json.example (sin credenciales)
+
+# 4. Renombrar el plugin
+#    - Editar plugin.local.json (name, version, description, defaultSettings)
 #    - Renombrar carpeta src/MyPlugin → src/MiPlugin
 #    - Actualizar namespace en todos los archivos .cs
 
-# 4. Crear una nueva feature (interactivo)
+# 5. Crear una nueva feature (interactivo)
 npm run new-feature
 
-# 5. Compilar
+# 6. Compilar
 dotnet build
 
-# 6. Empaquetar para deploy
+# 7. Empaquetar para deploy
 npm run package
-# Genera: dist/myplugin.1.0.0.zip
+# Usa plugin.local.json (local) o plugin.json (CI/CD)
+# Genera: dist/myplugin.1.0.8-abc1234.zip
+```
+
+### 🔒 Configuración: 3 Escenarios SUPER CLAROS
+
+#### 1️⃣ **Debug Local con DevHost (F5 en Visual Studio/Rider)**
+
+**📁 Archivo:** `src/DevHost/appsettings.Development.json` (gitignored ✅)
+
+**Qué hace:** DevHost lee este archivo y pasa valores al plugin via `IConfiguration`
+
+**Valores:** ✅ **REALES** (safe - archivo gitignored)
+
+```json
+{
+  "ConnectionStrings": { "Default": "..." },
+  "System": { "DashboardApiUrl": "..." },
+
+  // ✅ Poner credenciales REALES aquí
+  "AzureStorageUrl": "https://mi-storage-real.blob.core.windows.net",
+  "AzureStorageKey": "mi-key-real-abc123",
+  "ApiKey": "Bearer sk-xyz-real"
+}
+```
+
+**Acceso en plugin:**
+```csharp
+var url = _config["AzureStorageUrl"];  // ← Lee de appsettings.Development.json
+```
+
+---
+
+#### 2️⃣ **Package para Testing Local (npm run package)**
+
+**📁 Archivo:** `plugin.local.json` (gitignored ✅ por `*.local`)
+
+**Qué hace:** `package.mjs` lo detecta y lo usa para crear el ZIP
+
+**Valores:** ✅ **REALES** (safe - archivo gitignored)
+
+```json
+{
+  "name": "myplugin",
+  "version": "1.0.8",
+  "defaultSettings": {
+    // ✅ Poner credenciales REALES aquí
+    "AzureStorageUrl": "https://mi-storage-real.blob.core.windows.net",
+    "AzureStorageKey": "mi-key-real-abc123",
+    "MaxRetries": "5"
+  }
+}
+```
+
+**Crear archivo:**
+```bash
+cp plugin.local.json.example plugin.local.json
+# Editar con valores reales
+npm run package  # ← Usa plugin.local.json automáticamente
+```
+
+**Qué pasa:**
+- ZIP incluye `defaultSettings` con valores REALES
+- Al subir a Backend Host → Settings se auto-crean con valores REALES
+- Listo para probar sin configurar nada en UI
+
+---
+
+#### 3️⃣ **CI/CD Pipeline (Deployment a Producción)**
+
+**📁 Archivo:** `plugin.json` (commiteado ❌ - SIN credenciales)
+
+**Qué hace:** Pipeline usa este archivo (NO existe plugin.local.json en CI/CD)
+
+**Valores:** ❌ **VACÍOS o defaults seguros SOLAMENTE**
+
+```json
+{
+  "name": "myplugin",
+  "version": "1.0.8",
+  "defaultSettings": {
+    // ❌ NUNCA poner credenciales aquí (se commitea al repo)
+    "AzureStorageUrl": "",           // Vacío
+    "AzureStorageKey": "",            // Vacío
+    "MaxRetries": "3"                 // Safe default (OK)
+  }
+}
+```
+
+**Qué pasa:**
+- Pipeline: `npm run package` → NO encuentra `plugin.local.json` → Usa `plugin.json`
+- ZIP incluye `defaultSettings` con strings vacíos
+- Al subir a Backend Host → Settings se auto-crean VACÍOS
+- **Admin configura** valores reales vía UI (`/admin/settings/plugins`)
+
+---
+
+#### 📋 Tabla Comparativa de Archivos
+
+| Archivo | Gitignored | Credenciales | Escenario |
+|---------|------------|--------------|-----------|
+| `appsettings.Development.json` | ✅ Sí | ✅ REALES | DevHost debug (F5) |
+| `plugin.local.json` | ✅ Sí (`*.local`) | ✅ REALES | `npm run package` local |
+| `plugin.json` | ❌ **Commiteado** | ❌ **NUNCA** | CI/CD pipeline |
+| `plugin.json.example` | ❌ Commiteado | ❌ No | Template/documentación |
+| `plugin.local.json.example` | ❌ Commiteado | ❌ No | Template para copiar |
+
+---
+
+#### ⚠️ REGLA DE ORO
+
+**NUNCA** pongas credenciales en archivos commiteados:
+- ❌ `plugin.json` → Se commitea → **NO credentials**
+- ❌ `plugin.json.example` → Se commitea → **NO credentials**
+- ✅ `plugin.local.json` → Gitignored → **OK credentials**
+- ✅ `appsettings.Development.json` → Gitignored → **OK credentials**
+
 ```
 
 ## Estructura del Proyecto

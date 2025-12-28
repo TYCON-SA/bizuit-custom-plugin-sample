@@ -20,47 +20,45 @@
   "requiresDatabase": true,
 
   // =============================================================================
-  // Default Settings (Optional)
+  // Default Settings (Optional) - FOR CI/CD DEPLOYMENT
   // =============================================================================
-  // These settings are auto-created in BackendPluginConfig table when plugin
-  // is uploaded (if they don't already exist).
+  // This file is used by CI/CD pipelines to create the deployment ZIP.
+  // Values should be EMPTY or safe defaults only.
   //
-  // Use defaultSettings for:
-  // - Non-sensitive default values
-  // - Feature flags (enable/disable features)
-  // - Configurable limits (max retries, page sizes)
-  // - Values that work for most deployments but admin might want to customize
+  // For local development, use plugin.local.json.example instead.
   //
-  // DO NOT include:
-  // - Sensitive values (API keys, passwords) - admin configures these manually
-  // - Environment-specific values - use placeholders in examples
+  // CI/CD Pipeline Flow:
+  // 1. Copy plugin.json.example → plugin.json
+  // 2. Run: node scripts/sanitize-plugin-json.mjs (empties all values)
+  // 3. Run: npm run package (creates ZIP with sanitized plugin.json)
   //
-  // Admin can modify these via Admin UI: /admin/settings/plugins → Configuration
+  // Backend Host will auto-create these settings with empty values.
+  // Admin then configures real values via Admin UI.
 
   "defaultSettings": {
-    // Example: Pagination and limits
+    // External service URLs (empty - admin must configure)
+    "ExternalApiUrl": "",
+    "WebhookUrl": "",
+    "AzureStorageUrl": "",
+
+    // Credentials (empty - admin must configure as encrypted)
+    "ApiKey": "",
+    "AzureStorageKey": "",
+
+    // Safe defaults (can have values)
     "MaxItemsPerPage": "50",
     "MaxRetries": "3",
     "TimeoutSeconds": "30",
     "CacheTimeoutSeconds": "300",
 
-    // Example: Feature flags
+    // Feature flags (safe defaults)
     "EnableDebugLogs": "false",
     "EnableCaching": "true",
     "EnableNotifications": "false",
 
-    // Example: External service URLs (use placeholders)
-    "ExternalApiUrl": "https://api.example.com/v1",
-    "WebhookUrl": "https://YOUR_DOMAIN/webhook",
-
-    // Example: Business rules
+    // Business rules (safe defaults)
     "DefaultCurrency": "USD",
     "DefaultLanguage": "en"
-
-    // NOTE: Do NOT include sensitive values here:
-    // - API keys → Admin configures manually with "Encrypted" checked
-    // - Passwords → Admin configures manually with "Encrypted" checked
-    // - Access tokens → Admin configures manually with "Encrypted" checked
   }
 
   // =============================================================================

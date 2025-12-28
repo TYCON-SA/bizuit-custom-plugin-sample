@@ -23,6 +23,7 @@ import archiver from 'archiver';
 
 const ROOT_DIR = process.cwd();
 const PLUGIN_JSON_PATH = join(ROOT_DIR, 'plugin.json');
+const PLUGIN_LOCAL_PATH = join(ROOT_DIR, 'plugin.local.json');
 const PUBLISH_DIR = join(ROOT_DIR, 'src/MyPlugin/bin/Release/net9.0/publish');
 const DIST_DIR = join(ROOT_DIR, 'dist');
 
@@ -83,8 +84,13 @@ function getGitMetadata() {
 async function main() {
     console.log('📦 Packaging plugin...\n');
 
-    // Read plugin.json
-    const pluginJson = JSON.parse(readFileSync(PLUGIN_JSON_PATH, 'utf-8'));
+    // Read plugin.json (prefer plugin.local.json for local development)
+    const sourceFile = existsSync(PLUGIN_LOCAL_PATH) ? PLUGIN_LOCAL_PATH : PLUGIN_JSON_PATH;
+    const isLocal = sourceFile === PLUGIN_LOCAL_PATH;
+
+    console.log(`   Source: ${isLocal ? 'plugin.local.json (with real values)' : 'plugin.json'}`);
+
+    const pluginJson = JSON.parse(readFileSync(sourceFile, 'utf-8'));
     const { name, version } = pluginJson;
 
     console.log(`Plugin: ${name} v${version}`);
