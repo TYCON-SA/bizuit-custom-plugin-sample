@@ -85,6 +85,42 @@ stages:
             displayName: 'Calculate version'
 
           - script: |
+              echo "📝 Preparing plugin.json for CI/CD deployment..."
+              echo "This ensures NO credentials are included in the deployment ZIP"
+
+              # Backup current plugin.json (has updated version)
+              cp plugin.json plugin.version-updated.json
+
+              # Copy plugin.json.example as base (without credentials)
+              if [ -f "plugin.json.example" ]; then
+                cp plugin.json.example plugin.json
+                echo "✅ Copied plugin.json.example → plugin.json"
+              else
+                echo "⚠️  Warning: plugin.json.example not found, using existing plugin.json"
+              fi
+
+              # Restore version from backup
+              VERSION=$(jq -r '.version' plugin.version-updated.json)
+              jq --arg version "$VERSION" '.version = $version' plugin.json > plugin.tmp.json
+              mv plugin.tmp.json plugin.json
+              echo "✅ Restored version: $VERSION"
+
+              # Sanitize defaultSettings (empty all values for security)
+              if [ -f "scripts/sanitize-plugin-json.mjs" ]; then
+                node scripts/sanitize-plugin-json.mjs
+                echo "✅ Sanitized defaultSettings (all values emptied)"
+              else
+                echo "⚠️  Warning: sanitize script not found, skipping sanitization"
+              fi
+
+              # Show final defaultSettings for verification
+              echo ""
+              echo "📋 Final plugin.json defaultSettings:"
+              cat plugin.json | grep -A 20 "defaultSettings" || echo "(no defaultSettings)"
+              echo ""
+            displayName: 'Sanitize plugin.json (remove credentials)'
+
+          - script: |
               PLUGIN_NAME=$(jq -r '.name' plugin.json)
               PLUGIN_DESC=$(jq -r '.description // "Backend plugin"' plugin.json)
               PLUGIN_AUTHOR=$(jq -r '.author // "BIZUIT"' plugin.json)
