@@ -1,3 +1,6 @@
+using System.Net.Http.Json;
+using Bizuit.Backend.Core.Auth;
+using Microsoft.Extensions.Configuration;
 using MyPlugin.Features.Items.Models;
 
 namespace MyPlugin.Features.Items;
@@ -8,10 +11,17 @@ namespace MyPlugin.Features.Items;
 public class ItemsService
 {
     private readonly ItemsRepository _repository;
+    private readonly IConfiguration _config;
+    private readonly IHttpClientFactory? _httpClientFactory;
 
-    public ItemsService(ItemsRepository repository)
+    public ItemsService(
+        ItemsRepository repository,
+        IConfiguration config,
+        IHttpClientFactory? httpClientFactory = null)
     {
         _repository = repository;
+        _config = config;
+        _httpClientFactory = httpClientFactory;
     }
 
     public async Task<IEnumerable<Item>> GetAllAsync()
@@ -66,5 +76,46 @@ public class ItemsService
     public async Task<bool> DeleteAsync(int itemId)
     {
         return await _repository.DeleteAsync(itemId);
+    }
+
+    /// <summary>
+    /// EXAMPLE: Call Dashboard API from plugin.
+    /// This demonstrates how to access the Dashboard API URL from system configuration
+    /// and make authenticated requests using the user's token.
+    /// </summary>
+    /// <param name="user">User context with authentication token</param>
+    /// <param name="endpoint">Dashboard API endpoint (relative to base URL)</param>
+    /// <returns>Response from Dashboard API</returns>
+    public async Task<object?> CallDashboardApiAsync(BizuitUserContext user, string endpoint)
+    {
+        var dashboardApiUrl = _config["System:DashboardApiUrl"];
+        if (string.IsNullOrEmpty(dashboardApiUrl))
+        {
+            throw new InvalidOperationException("Dashboard API URL not configured in system settings");
+        }
+
+        if (_httpClientFactory == null)
+        {
+            throw new InvalidOperationException("HttpClientFactory not registered. Ensure DashboardClient is configured in ConfigureServices.");
+        }
+
+        var client = _httpClientFactory.CreateClient("DashboardClient");
+
+        // Use user's RawToken for authentication
+        client.DefaultRequestHeaders.Clear();
+        client.DefaultRequestHeaders.Add("Authorization", $"Bearer {user.RawToken}");
+        client.DefaultRequestHeaders.Add("X-Tenant-Id", user.TenantId);
+
+        try
+        {
+            var response = await client.GetAsync(endpoint);
+            response.EnsureSuccessStatusCode();
+
+            return await response.Content.ReadFromJsonAsync<object>();
+        }
+        catch (HttpRequestException ex)
+        {
+            throw new InvalidOperationException($"Failed to call Dashboard API endpoint '{endpoint}': {ex.Message}", ex);
+        }
     }
 }

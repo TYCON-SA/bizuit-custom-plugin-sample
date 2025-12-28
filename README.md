@@ -1670,6 +1670,126 @@ public void ConfigureServices(IServiceCollection services, IConfiguration config
 }
 ```
 
+## System Configuration
+
+Plugins have access to system-level configuration automatically injected by the Backend Host. These configs are **read-only** and managed by system administrators in the SystemConfiguration table.
+
+### Available System Configs
+
+| Key | Description | Example Value |
+|-----|-------------|---------------|
+| `System:DashboardApiUrl` | Dashboard API base URL | `https://test.bizuit.com/arielschBIZUITDashboardAPI/api` |
+| `System:TenantId` | Current tenant identifier | `default`, `arielsch`, `recubiz` |
+
+### Accessing System Configuration
+
+**During Service Registration (ConfigureServices):**
+
+```csharp
+public void ConfigureServices(IServiceCollection services, IConfiguration configuration)
+{
+    var connectionString = configuration.GetConnectionString("Default");
+
+    // Get system configuration injected by Backend Host
+    var dashboardApiUrl = configuration["System:DashboardApiUrl"];
+    var tenantId = configuration["System:TenantId"];
+
+    Console.WriteLine($"[MyPlugin] Loaded for tenant '{tenantId}' with Dashboard API: {dashboardApiUrl}");
+
+    // Optional: Register HttpClient for Dashboard API calls
+    if (!string.IsNullOrEmpty(dashboardApiUrl))
+    {
+        services.AddHttpClient("DashboardClient", client =>
+        {
+            client.BaseAddress = new Uri(dashboardApiUrl);
+            client.Timeout = TimeSpan.FromSeconds(30);
+        });
+    }
+
+    // Register your services
+    services.AddScoped<ItemsService>();
+    services.AddScoped<ItemsRepository>();
+}
+```
+
+**During Request Handling (in services):**
+
+```csharp
+public class ItemsService
+{
+    private readonly IConfiguration _config;
+    private readonly IHttpClientFactory _httpClientFactory;
+    private readonly ItemsRepository _repository;
+
+    public ItemsService(
+        IConfiguration config,
+        IHttpClientFactory httpClientFactory,
+        ItemsRepository repository)
+    {
+        _config = config;
+        _httpClientFactory = httpClientFactory;
+        _repository = repository;
+    }
+
+    // Example: Call Dashboard API from plugin
+    public async Task<object> CallDashboardAsync(BizuitUserContext user, string endpoint)
+    {
+        var dashboardApiUrl = _config["System:DashboardApiUrl"];
+        var client = _httpClientFactory.CreateClient("DashboardClient");
+
+        // Use user's RawToken for authentication
+        client.DefaultRequestHeaders.Add("Authorization", $"Bearer {user.RawToken}");
+        client.DefaultRequestHeaders.Add("X-Tenant-Id", user.TenantId);
+
+        var response = await client.GetAsync(endpoint);
+        response.EnsureSuccessStatusCode();
+
+        return await response.Content.ReadFromJsonAsync<object>();
+    }
+}
+```
+
+### Multi-Tenant Considerations
+
+- The `System:DashboardApiUrl` is loaded **once** when the plugin is loaded (for the `default` tenant)
+- For true multi-tenant support where each tenant has different Dashboard URLs, this will be enhanced in a future version
+- The `BizuitUserContext.TenantId` property always contains the current request's tenant ID
+- The `BizuitUserContext.RawToken` can be used to authenticate with the Dashboard API
+
+### Use Cases for Dashboard API Integration
+
+Common scenarios where you might call the Dashboard API from a plugin:
+
+1. **Fetch User Details**: Get full user profile information
+2. **Access BPMN Processes**: Trigger or query business processes
+3. **Retrieve Companies/Roles**: Get organization structure data
+4. **Send Notifications**: Trigger emails or alerts through Dashboard
+5. **Validate Permissions**: Check user permissions in Dashboard context
+
+**Example - Get User Details:**
+
+```csharp
+public async Task<UserDetails> GetUserDetailsAsync(BizuitUserContext user)
+{
+    var endpoint = $"/users/{user.Username}";
+    return await CallDashboardApiAsync(user, endpoint);
+}
+```
+
+**Example - Trigger BPMN Process:**
+
+```csharp
+public async Task TriggerProcessAsync(BizuitUserContext user, string processName, object parameters)
+{
+    var endpoint = $"/bpmn/processes/{processName}/start";
+    var client = _httpClientFactory.CreateClient("DashboardClient");
+    client.DefaultRequestHeaders.Add("Authorization", $"Bearer {user.RawToken}");
+
+    var response = await client.PostAsJsonAsync(endpoint, parameters);
+    response.EnsureSuccessStatusCode();
+}
+```
+
 ## Troubleshooting
 
 ### Error: "Table does not exist"

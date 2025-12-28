@@ -32,10 +32,26 @@ public class MyPluginPlugin : IBackendPlugin
         // Get connection string from plugin configuration
         var connectionString = configuration.GetConnectionString("Default");
 
+        // Get system configuration injected by Backend Host
+        var dashboardApiUrl = configuration["System:DashboardApiUrl"];
+        var tenantId = configuration["System:TenantId"];
+
+        Console.WriteLine($"[MyPlugin] Loaded for tenant '{tenantId}' with Dashboard API: {dashboardApiUrl ?? "(not configured)"}");
+
         if (!string.IsNullOrEmpty(connectionString))
         {
             // Add Bizuit Backend Core services (SafeQueryBuilder, etc.)
             services.AddBizuitBackendCore(connectionString);
+        }
+
+        // Optional: Register HttpClient for Dashboard API calls
+        if (!string.IsNullOrEmpty(dashboardApiUrl))
+        {
+            services.AddHttpClient("DashboardClient", client =>
+            {
+                client.BaseAddress = new Uri(dashboardApiUrl);
+                client.Timeout = TimeSpan.FromSeconds(30);
+            });
         }
 
         // Feature: Items (public CRUD)
