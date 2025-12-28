@@ -18,6 +18,27 @@
   },
 
   // =============================================================================
+  // System Configuration - Injected by Backend Host
+  // =============================================================================
+  "System": {
+    // DashboardApiUrl: Base URL of the BIZUIT Dashboard API
+    // Used by: Plugins that need to call Dashboard endpoints (users, processes, notifications, etc.)
+    // Format: Full URL including protocol and /api path
+    // Example: "https://your-dashboard.com/YOUR_TENANT_API/api"
+    // Local dev: Configure in appsettings.Development.json (gitignored)
+    // Production: Loaded from SystemConfiguration table with key DASHBOARD_API_URL (cached 1 hour)
+    // Access in plugin: configuration["System:DashboardApiUrl"]
+    "DashboardApiUrl": "https://YOUR_DASHBOARD_URL/YOUR_TENANT_API/api",
+
+    // TenantId: Identifier for multi-tenant scenarios
+    // Used by: Backend Host to isolate configuration and data per tenant
+    // Default: "default" (single-tenant)
+    // Multi-tenant examples: "tenant1", "customer-abc", "arielsch", "recubiz"
+    // Access in plugin: configuration["System:TenantId"]
+    "TenantId": "default"
+  },
+
+  // =============================================================================
   // DevHost Configuration
   // =============================================================================
   "DevHost": {
