@@ -1,0 +1,77 @@
+{
+  // =============================================================================
+  // Plugin Manifest Configuration
+  // =============================================================================
+  // This file defines plugin metadata and default configuration.
+  // All fields are required unless marked optional.
+
+  // Plugin identification (required)
+  "name": "myplugin",
+  "version": "1.0.0",
+  "description": "My custom backend plugin",
+  "author": "Your Name",
+
+  // Entry point (required)
+  "entryPoint": "MyPlugin.dll",
+  "pluginClass": "MyPlugin.MyPluginPlugin",
+
+  // Database requirement (optional, defaults to true)
+  // Set to false if your plugin doesn't need database access
+  "requiresDatabase": true,
+
+  // =============================================================================
+  // Default Settings (Optional)
+  // =============================================================================
+  // These settings are auto-created in BackendPluginConfig table when plugin
+  // is uploaded (if they don't already exist).
+  //
+  // Use defaultSettings for:
+  // - Non-sensitive default values
+  // - Feature flags (enable/disable features)
+  // - Configurable limits (max retries, page sizes)
+  // - Values that work for most deployments but admin might want to customize
+  //
+  // DO NOT include:
+  // - Sensitive values (API keys, passwords) - admin configures these manually
+  // - Environment-specific values - use placeholders in examples
+  //
+  // Admin can modify these via Admin UI: /admin/settings/plugins → Configuration
+
+  "defaultSettings": {
+    // Example: Pagination and limits
+    "MaxItemsPerPage": "50",
+    "MaxRetries": "3",
+    "TimeoutSeconds": "30",
+    "CacheTimeoutSeconds": "300",
+
+    // Example: Feature flags
+    "EnableDebugLogs": "false",
+    "EnableCaching": "true",
+    "EnableNotifications": "false",
+
+    // Example: External service URLs (use placeholders)
+    "ExternalApiUrl": "https://api.example.com/v1",
+    "WebhookUrl": "https://YOUR_DOMAIN/webhook",
+
+    // Example: Business rules
+    "DefaultCurrency": "USD",
+    "DefaultLanguage": "en"
+
+    // NOTE: Do NOT include sensitive values here:
+    // - API keys → Admin configures manually with "Encrypted" checked
+    // - Passwords → Admin configures manually with "Encrypted" checked
+    // - Access tokens → Admin configures manually with "Encrypted" checked
+  }
+
+  // =============================================================================
+  // Version Metadata (Auto-populated by Build Scripts)
+  // =============================================================================
+  // These fields are automatically added by npm run package script.
+  // DO NOT add manually - they will be overwritten.
+  //
+  // "commitHash": "abc123...",        // Git commit SHA
+  // "releaseNotes": "feat: ...",      // Git commit message
+  // "repositoryUrl": "https://...",   // Git remote URL
+  // "buildDate": "2025-12-28T...",    // ISO 8601 timestamp
+  // "buildUrl": "https://..."         // CI/CD build URL (added by pipeline)
+}
