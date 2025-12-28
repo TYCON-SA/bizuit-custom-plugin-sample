@@ -1,4 +1,5 @@
 using Bizuit.Backend.Core.Database;
+using Microsoft.AspNetCore.Http;
 using MyPlugin.Features.Products.Models;
 
 namespace MyPlugin.Features.Products;
@@ -17,8 +18,8 @@ public class ProductsRepository : SafeRepository<Product>
 {
     protected override string TableName => "Products";
 
-    public ProductsRepository(IConnectionFactory connectionFactory)
-        : base(connectionFactory)
+    public ProductsRepository(IConnectionFactory connectionFactory, IHttpContextAccessor? httpContextAccessor = null)
+        : base(connectionFactory, httpContextAccessor)
     {
     }
 

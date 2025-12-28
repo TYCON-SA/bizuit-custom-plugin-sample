@@ -1,4 +1,5 @@
 using Bizuit.Backend.Core.Database;
+using Microsoft.AspNetCore.Http;
 using MyPlugin.Features.AuditLogs.Models;
 
 namespace MyPlugin.Features.AuditLogs;
@@ -14,8 +15,8 @@ public class AuditLogsRepository : SafeRepository<AuditLog>
 {
     protected override string TableName => "AuditLogs";
 
-    public AuditLogsRepository(IConnectionFactory connectionFactory)
-        : base(connectionFactory)
+    public AuditLogsRepository(IConnectionFactory connectionFactory, IHttpContextAccessor? httpContextAccessor = null)
+        : base(connectionFactory, httpContextAccessor)
     {
     }
 

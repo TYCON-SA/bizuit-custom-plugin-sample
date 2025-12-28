@@ -1,4 +1,5 @@
 using System.Data;
+using Microsoft.AspNetCore.Http;
 using Bizuit.Backend.Core.Database;
 using MyPlugin.Features.Items.Models;
 
@@ -12,8 +13,8 @@ public class ItemsRepository : SafeRepository<Item>
 {
     protected override string TableName => "Items";
 
-    public ItemsRepository(IConnectionFactory connectionFactory)
-        : base(connectionFactory)
+    public ItemsRepository(IConnectionFactory connectionFactory, IHttpContextAccessor? httpContextAccessor = null)
+        : base(connectionFactory, httpContextAccessor)
     {
     }
 
