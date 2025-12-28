@@ -1,6 +1,6 @@
 {
   "name": "myplugin",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "My custom backend plugin",
   "author": "Your Name",
   "entryPoint": "MyPlugin.dll",
