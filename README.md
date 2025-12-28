@@ -286,7 +286,7 @@ Si tu plugin necesita llamar al Dashboard API, configurá la URL en `src/DevHost
 ```json
 {
   "System": {
-    "DashboardApiUrl": "https://test.bizuit.com/arielschBIZUITDashboardAPI/api",
+    "DashboardApiUrl": "https://YOUR_DASHBOARD_URL/YOUR_TENANT_API/api",
     "TenantId": "default"
   }
 }
@@ -301,7 +301,7 @@ O mejor aún, creá `src/DevHost/appsettings.Development.json` (no commitearlo):
     "Dashboard": "Server=localhost;Database=DashboardDB;User Id=sa;Password=YourPassword;TrustServerCertificate=True"
   },
   "System": {
-    "DashboardApiUrl": "https://test.bizuit.com/arielschBIZUITDashboardAPI/api",
+    "DashboardApiUrl": "https://YOUR_DASHBOARD_URL/YOUR_TENANT_API/api",
     "TenantId": "default"
   }
 }
@@ -1729,8 +1729,8 @@ Plugins have access to system-level configuration automatically injected by the 
 
 | Key | Description | Example Value |
 |-----|-------------|---------------|
-| `System:DashboardApiUrl` | Dashboard API base URL | `https://test.bizuit.com/arielschBIZUITDashboardAPI/api` |
-| `System:TenantId` | Current tenant identifier | `default`, `arielsch`, `recubiz` |
+| `System:DashboardApiUrl` | Dashboard API base URL | `https://YOUR_DASHBOARD_URL/YOUR_TENANT_API/api` |
+| `System:TenantId` | Current tenant identifier | `default`, `tenant1`, `tenant2` |
 
 ### Accessing System Configuration
 
