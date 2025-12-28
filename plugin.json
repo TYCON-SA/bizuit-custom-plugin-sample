@@ -5,5 +5,10 @@
   "author": "Your Name",
   "entryPoint": "MyPlugin.dll",
   "pluginClass": "MyPlugin.MyPluginPlugin",
-  "requiresDatabase": true
+  "requiresDatabase": true,
+  "defaultSettings": {
+    "MaxItemsPerPage": "50",
+    "EnableDebugLogs": "false",
+    "CacheTimeoutSeconds": "300"
+  }
 }
