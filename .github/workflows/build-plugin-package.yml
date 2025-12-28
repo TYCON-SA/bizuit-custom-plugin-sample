@@ -119,6 +119,30 @@ jobs:
           echo "Build completed"
           ls -la publish/
 
+      - name: Prepare plugin.json for deployment (sanitize credentials)
+        run: |
+          echo "📝 Preparing plugin.json for CI/CD deployment..."
+
+          # Copy plugin.json.example to plugin.json (without credentials)
+          if [ -f "plugin.json.example" ]; then
+            cp plugin.json.example plugin.json
+            echo "✅ Copied plugin.json.example → plugin.json"
+          else
+            echo "⚠️  Warning: plugin.json.example not found"
+          fi
+
+          # Sanitize defaultSettings (empty all values)
+          if [ -f "scripts/sanitize-plugin-json.mjs" ]; then
+            node scripts/sanitize-plugin-json.mjs
+            echo "✅ Sanitized defaultSettings"
+          else
+            echo "⚠️  Warning: sanitize script not found, skipping"
+          fi
+
+          # Show defaultSettings for verification
+          echo "📋 Final plugin.json defaultSettings:"
+          cat plugin.json | grep -A 20 "defaultSettings" || echo "(no defaultSettings)"
+
       - name: Create ZIP package
         id: create_zip
         run: |
@@ -130,7 +154,7 @@ jobs:
 
           mkdir -p dist
 
-          # Create ZIP with published files + plugin.json
+          # Create ZIP with published files + sanitized plugin.json
           cd publish
           cp ../plugin.json .
           zip -r "../dist/${ZIP_NAME}" .
