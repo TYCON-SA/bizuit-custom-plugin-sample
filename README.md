@@ -279,6 +279,57 @@ curl http://localhost:5001/api/me \
 
 ⚠️ **Importante**: Los tokens tienen expiración. Si tu token expira, necesitás obtener uno nuevo del Dashboard.
 
+### Configurar Dashboard API URL (Local Development)
+
+Si tu plugin necesita llamar al Dashboard API, configurá la URL en `src/DevHost/appsettings.json`:
+
+```json
+{
+  "System": {
+    "DashboardApiUrl": "https://test.bizuit.com/arielschBIZUITDashboardAPI/api",
+    "TenantId": "default"
+  }
+}
+```
+
+O mejor aún, creá `src/DevHost/appsettings.Development.json` (no commitearlo):
+
+```json
+{
+  "ConnectionStrings": {
+    "Default": "Server=localhost;Database=MyPluginDB;User Id=sa;Password=YourPassword;TrustServerCertificate=True",
+    "Dashboard": "Server=localhost;Database=DashboardDB;User Id=sa;Password=YourPassword;TrustServerCertificate=True"
+  },
+  "System": {
+    "DashboardApiUrl": "https://test.bizuit.com/arielschBIZUITDashboardAPI/api",
+    "TenantId": "default"
+  }
+}
+```
+
+**Nota:** El archivo `appsettings.Development.json` está en `.gitignore` para evitar commitear credenciales.
+
+**Ejemplo de uso en plugin:**
+
+```csharp
+public class MyService
+{
+    private readonly IConfiguration _config;
+    private readonly IHttpClientFactory _httpClientFactory;
+
+    public async Task<object> GetUserFromDashboard(BizuitUserContext user)
+    {
+        var dashboardApiUrl = _config["System:DashboardApiUrl"];
+        var client = _httpClientFactory.CreateClient("DashboardClient");
+
+        client.DefaultRequestHeaders.Add("Authorization", $"Bearer {user.RawToken}");
+
+        var response = await client.GetAsync($"{dashboardApiUrl}/users/{user.Username}");
+        return await response.Content.ReadFromJsonAsync<object>();
+    }
+}
+```
+
 ## Setup de Base de Datos
 
 Antes de activar el plugin, crear las tablas en SQL Server:
