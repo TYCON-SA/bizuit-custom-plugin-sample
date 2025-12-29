@@ -59,8 +59,26 @@ stages:
               # Pull latest changes to get version commits (they have [skip ci] so won't be in checkout)
               git pull origin main --rebase || true
 
+              # Validate plugin.json is valid JSON before proceeding
+              echo "📋 Validating plugin.json..."
+              if ! jq empty plugin.json 2>/dev/null; then
+                echo "❌ ERROR: plugin.json is not valid JSON!"
+                echo "Content:"
+                cat plugin.json
+                echo ""
+                echo "Attempting to restore from plugin.json.example..."
+                if [ -f "plugin.json.example" ] && jq empty plugin.json.example 2>/dev/null; then
+                  cp plugin.json.example plugin.json
+                  echo "✅ Restored from plugin.json.example"
+                else
+                  echo "❌ FATAL: Cannot recover plugin.json"
+                  exit 1
+                fi
+              fi
+              echo "✅ plugin.json is valid JSON"
+
               # Read current version from plugin.json (this is the source of truth)
-              CURRENT_VERSION=$(jq -r '.version' plugin.json)
+              CURRENT_VERSION=$(jq -r '.version // "0.0.0"' plugin.json)
               echo "Current version in plugin.json: $CURRENT_VERSION"
 
               # Validate current version format
@@ -77,21 +95,39 @@ stages:
 
               echo "##vso[task.setvariable variable=pluginVersion]$NEW_VERSION"
 
-              # Update plugin.json with new version
-              jq --arg version "$NEW_VERSION" '.version = $version' plugin.json > plugin.tmp.json
-              mv plugin.tmp.json plugin.json
-
-              echo "Updated plugin.json to version $NEW_VERSION"
+              # Update plugin.json with new version (with validation)
+              if jq --arg version "$NEW_VERSION" '.version = $version' plugin.json > plugin.tmp.json && [ -s plugin.tmp.json ]; then
+                mv plugin.tmp.json plugin.json
+                echo "✅ Updated plugin.json to version $NEW_VERSION"
+              else
+                echo "❌ ERROR: Failed to update version in plugin.json"
+                rm -f plugin.tmp.json
+                exit 1
+              fi
             displayName: 'Calculate version'
 
           - script: |
-              # Read metadata BEFORE sanitizing (plugin.json has valid JSON without comments)
-              PLUGIN_NAME=$(jq -r '.name' plugin.json)
+              # Validate plugin.json before reading metadata
+              if ! jq empty plugin.json 2>/dev/null; then
+                echo "❌ ERROR: plugin.json is not valid JSON!"
+                exit 1
+              fi
+
+              # Read metadata
+              PLUGIN_NAME=$(jq -r '.name // "unknown"' plugin.json)
               PLUGIN_DESC=$(jq -r '.description // "Backend plugin"' plugin.json)
               PLUGIN_AUTHOR=$(jq -r '.author // "BIZUIT"' plugin.json)
 
               # Derive project name from entryPoint (e.g., "MyPlugin.dll" -> "MyPlugin")
-              ENTRY_POINT=$(jq -r '.entryPoint' plugin.json)
+              ENTRY_POINT=$(jq -r '.entryPoint // ""' plugin.json)
+
+              if [ -z "$ENTRY_POINT" ] || [ "$ENTRY_POINT" = "null" ]; then
+                echo "❌ ERROR: entryPoint not found in plugin.json!"
+                echo "Content of plugin.json:"
+                cat plugin.json
+                exit 1
+              fi
+
               PROJECT_NAME="${ENTRY_POINT%.dll}"
 
               echo "##vso[task.setvariable variable=pluginName]$PLUGIN_NAME"
@@ -102,6 +138,7 @@ stages:
               echo "Plugin: $PLUGIN_NAME"
               echo "Project: $PROJECT_NAME"
               echo "Description: $PLUGIN_DESC"
+              echo "Entry Point: $ENTRY_POINT"
             displayName: 'Read plugin metadata'
 
           - script: |
@@ -113,17 +150,29 @@ stages:
 
               # Copy plugin.json.example as base (without credentials)
               if [ -f "plugin.json.example" ]; then
-                cp plugin.json.example plugin.json
-                echo "✅ Copied plugin.json.example → plugin.json"
+                # Validate plugin.json.example is valid JSON
+                if jq empty plugin.json.example 2>/dev/null; then
+                  cp plugin.json.example plugin.json
+                  echo "✅ Copied plugin.json.example → plugin.json"
+                else
+                  echo "❌ ERROR: plugin.json.example is not valid JSON!"
+                  cat plugin.json.example
+                  exit 1
+                fi
               else
                 echo "⚠️  Warning: plugin.json.example not found, using existing plugin.json"
               fi
 
-              # Restore version from backup
+              # Restore version from backup (with validation)
               VERSION=$(jq -r '.version' plugin.version-updated.json)
-              jq --arg version "$VERSION" '.version = $version' plugin.json > plugin.tmp.json
-              mv plugin.tmp.json plugin.json
-              echo "✅ Restored version: $VERSION"
+              if jq --arg version "$VERSION" '.version = $version' plugin.json > plugin.tmp.json && [ -s plugin.tmp.json ]; then
+                mv plugin.tmp.json plugin.json
+                echo "✅ Restored version: $VERSION"
+              else
+                echo "❌ ERROR: Failed to restore version"
+                rm -f plugin.tmp.json
+                exit 1
+              fi
 
               # Sanitize defaultSettings (empty all values for security)
               if [ -f "scripts/sanitize-plugin-json.mjs" ]; then
@@ -133,15 +182,28 @@ stages:
                 echo "⚠️  Warning: sanitize script not found, skipping sanitization"
               fi
 
-              # Show final defaultSettings for verification
+              # Final validation
+              if ! jq empty plugin.json 2>/dev/null; then
+                echo "❌ ERROR: plugin.json is corrupted after sanitization!"
+                exit 1
+              fi
+
+              # Show final plugin.json for verification
               echo ""
-              echo "📋 Final plugin.json defaultSettings:"
-              cat plugin.json | grep -A 20 "defaultSettings" || echo "(no defaultSettings)"
+              echo "📋 Final plugin.json:"
+              cat plugin.json
               echo ""
             displayName: 'Sanitize plugin.json (remove credentials)'
 
           - script: |
               echo "Building plugin..."
+
+              # Validate projectName is set
+              if [ -z "$(projectName)" ]; then
+                echo "❌ ERROR: projectName variable is empty!"
+                exit 1
+              fi
+
               dotnet publish src/$(projectName)/$(projectName).csproj -c Release -o publish
 
               echo "Build completed"
@@ -174,14 +236,20 @@ stages:
               echo "  - buildUrl: $BUILD_URL"
               echo "  - repositoryUrl: $REPO_URL"
 
-              # Enrich plugin.json with all metadata
-              jq --arg commitHash "$COMMIT_HASH" \
+              # Enrich plugin.json with all metadata (with validation)
+              if jq --arg commitHash "$COMMIT_HASH" \
                  --arg buildDate "$BUILD_DATE" \
                  --arg releaseNotes "$RELEASE_NOTES" \
                  --arg repositoryUrl "$REPO_URL" \
                  --arg buildUrl "$BUILD_URL" \
                  '. + {commitHash: $commitHash, buildDate: $buildDate, releaseNotes: $releaseNotes, repositoryUrl: $repositoryUrl, buildUrl: $buildUrl}' \
-                 plugin.json > plugin.enriched.json
+                 plugin.json > plugin.enriched.json && [ -s plugin.enriched.json ]; then
+                echo "✅ Enriched plugin.json with metadata"
+              else
+                echo "❌ ERROR: Failed to enrich plugin.json"
+                rm -f plugin.enriched.json
+                exit 1
+              fi
 
               # Create ZIP with published files + enriched plugin.json
               cd publish
@@ -193,6 +261,11 @@ stages:
 
               echo "Created: dist/${ZIP_NAME}"
               ls -la dist/
+
+              # Verify plugin.json in ZIP is not empty
+              echo ""
+              echo "📋 Verifying plugin.json in ZIP:"
+              unzip -p "dist/${ZIP_NAME}" plugin.json | head -20
             displayName: 'Create ZIP package with metadata'
 
           - task: PublishPipelineArtifact@1
@@ -204,6 +277,23 @@ stages:
 
           - script: |
               echo "📝 Committing version update..."
+
+              # IMPORTANT: Restore the ORIGINAL plugin.json structure before committing
+              # We need to commit plugin.json with the new version but WITHOUT defaultSettings
+              # (defaultSettings should only exist in plugin.json.example)
+
+              # Create a clean plugin.json with just the essential fields
+              jq '{name, version, description, author, entryPoint, pluginClass}' plugin.version-updated.json > plugin.json
+
+              # Validate before committing
+              if ! jq empty plugin.json 2>/dev/null || [ ! -s plugin.json ]; then
+                echo "❌ ERROR: plugin.json is invalid before commit!"
+                cat plugin.json
+                exit 1
+              fi
+
+              echo "📋 plugin.json to commit:"
+              cat plugin.json
 
               git config user.name "Azure Pipelines"
               git config user.email "azure-pipelines@dev.azure.com"
