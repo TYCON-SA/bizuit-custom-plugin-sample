@@ -85,6 +85,26 @@ stages:
             displayName: 'Calculate version'
 
           - script: |
+              # Read metadata BEFORE sanitizing (plugin.json has valid JSON without comments)
+              PLUGIN_NAME=$(jq -r '.name' plugin.json)
+              PLUGIN_DESC=$(jq -r '.description // "Backend plugin"' plugin.json)
+              PLUGIN_AUTHOR=$(jq -r '.author // "BIZUIT"' plugin.json)
+
+              # Derive project name from entryPoint (e.g., "MyPlugin.dll" -> "MyPlugin")
+              ENTRY_POINT=$(jq -r '.entryPoint' plugin.json)
+              PROJECT_NAME="${ENTRY_POINT%.dll}"
+
+              echo "##vso[task.setvariable variable=pluginName]$PLUGIN_NAME"
+              echo "##vso[task.setvariable variable=pluginDesc]$PLUGIN_DESC"
+              echo "##vso[task.setvariable variable=pluginAuthor]$PLUGIN_AUTHOR"
+              echo "##vso[task.setvariable variable=projectName]$PROJECT_NAME"
+
+              echo "Plugin: $PLUGIN_NAME"
+              echo "Project: $PROJECT_NAME"
+              echo "Description: $PLUGIN_DESC"
+            displayName: 'Read plugin metadata'
+
+          - script: |
               echo "📝 Preparing plugin.json for CI/CD deployment..."
               echo "This ensures NO credentials are included in the deployment ZIP"
 
@@ -119,25 +139,6 @@ stages:
               cat plugin.json | grep -A 20 "defaultSettings" || echo "(no defaultSettings)"
               echo ""
             displayName: 'Sanitize plugin.json (remove credentials)'
-
-          - script: |
-              PLUGIN_NAME=$(jq -r '.name' plugin.json)
-              PLUGIN_DESC=$(jq -r '.description // "Backend plugin"' plugin.json)
-              PLUGIN_AUTHOR=$(jq -r '.author // "BIZUIT"' plugin.json)
-
-              # Derive project name from entryPoint (e.g., "MyPlugin.dll" -> "MyPlugin")
-              ENTRY_POINT=$(jq -r '.entryPoint' plugin.json)
-              PROJECT_NAME="${ENTRY_POINT%.dll}"
-
-              echo "##vso[task.setvariable variable=pluginName]$PLUGIN_NAME"
-              echo "##vso[task.setvariable variable=pluginDesc]$PLUGIN_DESC"
-              echo "##vso[task.setvariable variable=pluginAuthor]$PLUGIN_AUTHOR"
-              echo "##vso[task.setvariable variable=projectName]$PROJECT_NAME"
-
-              echo "Plugin: $PLUGIN_NAME"
-              echo "Project: $PROJECT_NAME"
-              echo "Description: $PLUGIN_DESC"
-            displayName: 'Read plugin metadata'
 
           - script: |
               echo "Building plugin..."
