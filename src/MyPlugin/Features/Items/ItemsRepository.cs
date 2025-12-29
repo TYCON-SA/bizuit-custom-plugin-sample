@@ -13,8 +13,8 @@ public class ItemsRepository : SafeRepository<Item>
 {
     protected override string TableName => "Items";
 
-    public ItemsRepository(IConnectionFactory connectionFactory, IHttpContextAccessor? httpContextAccessor = null)
-        : base(connectionFactory, httpContextAccessor)
+    public ItemsRepository(IConnectionFactory connectionFactory)
+        : base(connectionFactory)
     {
     }
 
