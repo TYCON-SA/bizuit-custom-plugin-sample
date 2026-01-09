@@ -1001,6 +1001,50 @@ public void ConfigureServices(IServiceCollection services, IConfiguration config
 }
 ```
 
+### ⚠️ CRÍTICO: IConfiguration NO está disponible via DI en Backend Host
+
+**El Backend Host NO registra `IConfiguration` en el contenedor de DI.** Si creás un servicio que depende de `IConfiguration`, fallará en runtime:
+
+```
+System.InvalidOperationException: Unable to resolve service for type
+'Microsoft.Extensions.Configuration.IConfiguration' while attempting to activate 'MyService'.
+```
+
+**❌ NO hagas esto** - fallará en Backend Host:
+```csharp
+// Esta clase depende de IConfiguration via constructor injection
+public class MyService
+{
+    public MyService(IConfiguration configuration) // ❌ Fallará!
+    {
+        _connectionString = configuration.GetConnectionString("Default");
+    }
+}
+
+// En ConfigureServices:
+services.AddSingleton<MyService>();  // ❌ DI no puede resolver IConfiguration
+```
+
+**✅ Hacé esto en su lugar** - usá factory delegate:
+```csharp
+// Misma clase, mismo constructor
+public class MyService
+{
+    public MyService(IConfiguration configuration)
+    {
+        _connectionString = configuration.GetConnectionString("Default");
+    }
+}
+
+// En ConfigureServices - usá factory para pasar configuration directamente:
+services.AddSingleton<MyService>(sp =>
+{
+    return new MyService(configuration);  // ✅ Pasá configuration del scope de ConfigureServices
+});
+```
+
+**Por qué funciona**: El parámetro `configuration` está disponible en el scope del método `ConfigureServices`. Usando un factory delegate, lo pasás directamente en lugar de depender de la resolución de DI.
+
 ## Troubleshooting
 
 ### Error: "Table does not exist"
@@ -1844,6 +1888,50 @@ public void ConfigureServices(IServiceCollection services, IConfiguration config
     var maxItems = configuration.GetValue<int>("MaxItemsPerPage", 100);
 }
 ```
+
+### ⚠️ CRITICAL: IConfiguration is NOT available via DI in Backend Host
+
+**The Backend Host does NOT register `IConfiguration` in the DI container.** If you create a service that depends on `IConfiguration`, it will fail at runtime:
+
+```
+System.InvalidOperationException: Unable to resolve service for type
+'Microsoft.Extensions.Configuration.IConfiguration' while attempting to activate 'MyService'.
+```
+
+**❌ DON'T do this** - will fail in Backend Host:
+```csharp
+// This class depends on IConfiguration via constructor injection
+public class MyService
+{
+    public MyService(IConfiguration configuration) // ❌ Will fail!
+    {
+        _connectionString = configuration.GetConnectionString("Default");
+    }
+}
+
+// In ConfigureServices:
+services.AddSingleton<MyService>();  // ❌ DI can't resolve IConfiguration
+```
+
+**✅ DO this instead** - use factory delegate:
+```csharp
+// Same class, same constructor
+public class MyService
+{
+    public MyService(IConfiguration configuration)
+    {
+        _connectionString = configuration.GetConnectionString("Default");
+    }
+}
+
+// In ConfigureServices - use factory to pass configuration directly:
+services.AddSingleton<MyService>(sp =>
+{
+    return new MyService(configuration);  // ✅ Pass configuration from ConfigureServices scope
+});
+```
+
+**Why this works**: The `configuration` parameter is available in the `ConfigureServices` method scope. By using a factory delegate, you pass it directly instead of relying on DI resolution.
 
 ## System Configuration
 

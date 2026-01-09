@@ -6,6 +6,7 @@ using MyPlugin.Features.Items;
 using MyPlugin.Features.Products;
 using MyPlugin.Features.AuditLogs;
 using MyPlugin.Features.Me;
+using MyPlugin.Shared;
 
 namespace MyPlugin;
 
@@ -64,6 +65,14 @@ public class MyPluginPlugin : IBackendPlugin
 
         // Feature: AuditLogs ([NoTransaction] endpoints)
         services.AddScoped<AuditLogsRepository>();
+
+        // Shared: Plugin Logger (writes to BZExtPluginLogs table)
+        // IMPORTANT: Use factory delegate because IConfiguration is NOT available via DI in Backend Host!
+        // See README.md section "IConfiguration is NOT available via DI" for details.
+        services.AddSingleton<PluginLogger>(sp =>
+        {
+            return new PluginLogger(configuration);  // Pass configuration from this scope
+        });
     }
 
     public void ConfigureEndpoints(IPluginEndpointBuilder endpoints)
