@@ -639,6 +639,50 @@ public void ConfigureServices(IServiceCollection services, IConfiguration config
 
 Configuration is injected at plugin load time and stored per-plugin instance.
 
+### ⚠️ CRITICAL: IConfiguration is NOT available via DI in Backend Host
+
+**The Backend Host does NOT register `IConfiguration` in the DI container.** If you create a service that depends on `IConfiguration`, it will fail at runtime:
+
+```
+System.InvalidOperationException: Unable to resolve service for type
+'Microsoft.Extensions.Configuration.IConfiguration' while attempting to activate 'MyService'.
+```
+
+**❌ DON'T do this** - will fail in Backend Host:
+```csharp
+// This class depends on IConfiguration via constructor injection
+public class MyService
+{
+    public MyService(IConfiguration configuration) // ❌ Will fail!
+    {
+        _connectionString = configuration.GetConnectionString("Default");
+    }
+}
+
+// In ConfigureServices:
+services.AddSingleton<MyService>();  // ❌ DI can't resolve IConfiguration
+```
+
+**✅ DO this instead** - use factory delegate:
+```csharp
+// Same class, same constructor
+public class MyService
+{
+    public MyService(IConfiguration configuration)
+    {
+        _connectionString = configuration.GetConnectionString("Default");
+    }
+}
+
+// In ConfigureServices - use factory to pass configuration directly:
+services.AddSingleton<MyService>(sp =>
+{
+    return new MyService(configuration);  // ✅ Pass configuration from ConfigureServices scope
+});
+```
+
+**Why this works**: The `configuration` parameter is available in the `ConfigureServices` method scope. By using a factory delegate, you pass it directly instead of relying on DI resolution.
+
 ## Solution Structure
 
 The `.sln` includes three projects:
