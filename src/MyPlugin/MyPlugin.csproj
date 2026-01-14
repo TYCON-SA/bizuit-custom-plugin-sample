@@ -8,7 +8,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Bizuit.Backend.Core" Version="1.0.11" />
+    <PackageReference Include="Bizuit.Backend.Core" Version="1.0.12" />
   </ItemGroup>
 
   <ItemGroup>
