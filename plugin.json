@@ -6,6 +6,9 @@
   "entryPoint": "MyPlugin.dll",
   "pluginClass": "MyPlugin.MyPluginPlugin",
   "requiresDatabase": true,
+  "migrations": {
+    "enabled": true
+  },
   "defaultSettings": {
     "MaxItemsPerPage": "50",
     "EnableDebugLogs": "false",

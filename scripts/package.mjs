@@ -162,6 +162,21 @@ async function createZip(sourceDir, zipPath, pluginJson) {
         // Add enriched plugin.json at root
         archive.append(JSON.stringify(pluginJson, null, 2), { name: 'plugin.json' });
 
+        // Include database migrations if present (database/ → migrations/ in ZIP)
+        const databaseDir = join(ROOT_DIR, 'database');
+        if (existsSync(databaseDir)) {
+            const sqlFiles = readdirSync(databaseDir)
+                .filter(f => f.endsWith('.sql') && /^\d{3}_/.test(f))
+                .sort();
+            if (sqlFiles.length > 0) {
+                console.log(`\n📂 Including ${sqlFiles.length} migration script(s)...`);
+                for (const file of sqlFiles) {
+                    archive.file(join(databaseDir, file), { name: `migrations/${file}` });
+                    console.log(`   + migrations/${file}`);
+                }
+            }
+        }
+
         archive.finalize();
     });
 }
