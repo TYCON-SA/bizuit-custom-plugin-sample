@@ -178,9 +178,12 @@ bizuit-custom-plugin-sample/
 ├── tests/MyPlugin.Tests/              # Tests unitarios (xUnit)
 ├── database/                          # Scripts SQL
 │   ├── 001_CreateItemsTable.sql
+│   ├── 001_CreateItemsTable.rollback.sql
 │   ├── 002_CreateProductsTable.sql
+│   ├── 002_CreateProductsTable.rollback.sql
 │   ├── 003_CreateAuditLogsTable.sql
-│   └── setup-database.sql             # Script consolidado
+│   ├── 003_CreateAuditLogsTable.rollback.sql
+│   └── setup-database.sql             # Script consolidado (solo DevHost)
 ├── scripts/
 │   ├── new-feature.mjs                # Crear nueva feature (interactivo)
 │   └── package.mjs                    # Empaquetar para deploy
@@ -201,7 +204,10 @@ El archivo `plugin.json` define la metadata del plugin:
   "author": "Your Name",
   "entryPoint": "MyPlugin.dll",
   "pluginClass": "MyPlugin.MyPluginPlugin",
-  "requiresDatabase": true
+  "requiresDatabase": true,
+  "migrations": {
+    "enabled": true
+  }
 }
 ```
 
@@ -214,6 +220,7 @@ El archivo `plugin.json` define la metadata del plugin:
 | `entryPoint` | ✅ | Nombre del DLL principal |
 | `pluginClass` | ✅ | Clase que implementa `IBackendPlugin` (namespace completo) |
 | `requiresDatabase` | ❌ | Si el plugin requiere connection string (default: `true`) |
+| `migrations` | ❌ | Configuracion de migraciones SQL (ver seccion [Migraciones](#migraciones-de-base-de-datos-automaticas)) |
 
 ### Campo `requiresDatabase`
 
@@ -473,6 +480,127 @@ sqlcmd -S <servidor> -d <database> -U <usuario> -P <password> \
 ```
 
 Los scripts son idempotentes (`IF NOT EXISTS`), pueden ejecutarse múltiples veces sin errores.
+
+## Migraciones de Base de Datos (Automaticas)
+
+Cuando el plugin tiene `"migrations": { "enabled": true }` en `plugin.json`, los scripts SQL de la carpeta `database/` se incluyen automaticamente en el ZIP de deployment bajo la carpeta `migrations/`. El Backend Host los valida y ejecuta cuando el administrador lo aprueba desde la UI.
+
+### Diferencia con setup-database.sql
+
+| Archivo | Proposito | Donde se ejecuta | Cuando |
+|---------|-----------|-------------------|--------|
+| `setup-database.sql` | Setup inicial para DevHost local | Manual (sqlcmd) | Desarrollo local |
+| `NNN_*.sql` (migraciones) | Cambios de esquema para produccion | Backend Host (automatico) | Upload + Approve |
+
+### Estructura del ZIP
+
+```
+myplugin.1.0.0-abc1234.zip
+├── plugin.json
+├── MyPlugin.dll
+├── MyPlugin.deps.json
+├── ... (otros DLLs)
+└── migrations/
+    ├── 001_CreateItemsTable.sql
+    ├── 001_CreateItemsTable.rollback.sql
+    ├── 002_CreateProductsTable.sql
+    ├── 002_CreateProductsTable.rollback.sql
+    ├── 003_CreateAuditLogsTable.sql
+    └── 003_CreateAuditLogsTable.rollback.sql
+```
+
+### Convenciones de Nombrado
+
+- **Forward:** `NNN_NombreDescriptivo.sql` (prefijo de 3 digitos, PascalCase)
+- **Rollback:** `NNN_NombreDescriptivo.rollback.sql` (companion, opcional pero recomendado)
+- Ejemplo: `004_AddCategoryToProducts.sql` + `004_AddCategoryToProducts.rollback.sql`
+
+### Reglas Obligatorias
+
+1. **Idempotencia**: Los scripts DEBEN usar `IF NOT EXISTS`, `IF COL_LENGTH() IS NULL`, etc.
+2. **Separador de batch**: Usar `GO` como separador (requerido para CREATE VIEW/TRIGGER)
+3. **Tamano maximo**: 1 MB por script, 5 MB total
+4. **Encoding**: UTF-8
+5. **Nunca modificar** una migracion ya aplicada (conflicto de hash) - crear un nuevo script numerado
+
+### Patrones Prohibidos (bloquean upload)
+
+Los siguientes patrones SQL son rechazados por el validador:
+
+| Patron | Razon |
+|--------|-------|
+| `xp_cmdshell`, `sp_OA*` | Ejecucion de comandos del SO |
+| `OPENROWSET`, `OPENQUERY`, `OPENDATASOURCE` | Acceso a datos remotos |
+| `BULK INSERT` | Carga masiva no controlada |
+| `CREATE/DROP/ALTER DATABASE` | Modificacion de base de datos |
+| `USE [` | Cambio de contexto de base de datos |
+| `sp_configure`, `RECONFIGURE` | Configuracion del servidor |
+| `CREATE/ALTER ASSEMBLY` | Codigo CLR |
+| `DBCC` | Comandos de mantenimiento |
+| `SHUTDOWN` | Apagado del servidor |
+| `BACKUP/RESTORE` | Operaciones de backup |
+| `CREATE/ALTER LOGIN` | Gestion de seguridad |
+
+### Patrones con Warning (no bloquean, solo advierte)
+
+| Patron | Razon |
+|--------|-------|
+| `DROP TABLE/INDEX/PROCEDURE/VIEW` | Eliminacion de objetos |
+| `TRUNCATE TABLE` | Eliminacion masiva de datos |
+| `DELETE FROM` sin `WHERE` | Eliminacion sin filtro |
+| `UPDATE` sin `WHERE` | Actualizacion sin filtro |
+| `EXEC(`/`sp_executesql` | SQL dinamico |
+
+### Flujo de Ejecucion
+
+1. **Upload**: El admin sube el ZIP con migraciones
+2. **Validate**: El Backend Host valida todos los scripts (tamano, encoding, patrones prohibidos, hash)
+3. **Execute** (paso separado): El admin aprueba la ejecucion desde la UI
+4. **Activate**: Una vez ejecutadas las migraciones, el plugin se puede activar
+
+### Ejemplo de Migracion
+
+**Forward** (`004_AddCategoryToProducts.sql`):
+```sql
+-- ============================================
+-- Migration: 004_AddCategoryToProducts
+-- Adds Category column to Products table
+-- ============================================
+
+IF COL_LENGTH('Products', 'Category') IS NULL
+BEGIN
+    ALTER TABLE Products ADD Category NVARCHAR(100) NULL;
+    PRINT 'Column Category added to Products';
+END
+GO
+
+-- Add default value for existing rows
+UPDATE Products SET Category = 'General' WHERE Category IS NULL;
+GO
+```
+
+**Rollback** (`004_AddCategoryToProducts.rollback.sql`):
+```sql
+-- ============================================
+-- Rollback: 004_AddCategoryToProducts
+-- Removes Category column from Products table
+-- ============================================
+
+IF COL_LENGTH('Products', 'Category') IS NOT NULL
+BEGIN
+    ALTER TABLE Products DROP COLUMN Category;
+    PRINT 'Column Category removed from Products';
+END
+GO
+```
+
+### Crear Nueva Migracion
+
+1. Elegir el siguiente numero disponible (ej: si la ultima es `003_`, la nueva es `004_`)
+2. Crear el script forward: `database/004_MiCambio.sql`
+3. Crear el script rollback: `database/004_MiCambio.rollback.sql`
+4. Verificar que el script es idempotente
+5. Hacer `npm run package` para incluir en el ZIP
 
 ## Crear Nueva Feature
 
@@ -1117,9 +1245,12 @@ bizuit-custom-plugin-sample/
 ├── tests/MyPlugin.Tests/              # Unit tests (xUnit)
 ├── database/                          # SQL scripts
 │   ├── 001_CreateItemsTable.sql
+│   ├── 001_CreateItemsTable.rollback.sql
 │   ├── 002_CreateProductsTable.sql
+│   ├── 002_CreateProductsTable.rollback.sql
 │   ├── 003_CreateAuditLogsTable.sql
-│   └── setup-database.sql             # Consolidated script
+│   ├── 003_CreateAuditLogsTable.rollback.sql
+│   └── setup-database.sql             # Consolidated script (DevHost only)
 ├── scripts/
 │   ├── new-feature.mjs                # Create new feature (interactive)
 │   └── package.mjs                    # Package for deployment
@@ -1140,7 +1271,10 @@ The `plugin.json` file defines the plugin metadata:
   "author": "Your Name",
   "entryPoint": "MyPlugin.dll",
   "pluginClass": "MyPlugin.MyPluginPlugin",
-  "requiresDatabase": true
+  "requiresDatabase": true,
+  "migrations": {
+    "enabled": true
+  }
 }
 ```
 
@@ -1153,6 +1287,7 @@ The `plugin.json` file defines the plugin metadata:
 | `entryPoint` | ✅ | Main DLL name |
 | `pluginClass` | ✅ | Class implementing `IBackendPlugin` (full namespace) |
 | `requiresDatabase` | ❌ | Whether plugin requires connection string (default: `true`) |
+| `migrations` | ❌ | SQL migration configuration (see [Database Migrations](#database-migrations-automatic)) |
 
 ### `requiresDatabase` Field
 
@@ -1361,6 +1496,127 @@ sqlcmd -S <server> -d <database> -U <user> -P <password> \
 ```
 
 Scripts are idempotent (`IF NOT EXISTS`), they can be executed multiple times without errors.
+
+## Database Migrations (Automatic)
+
+When the plugin has `"migrations": { "enabled": true }` in `plugin.json`, SQL scripts from the `database/` folder are automatically included in the deployment ZIP under the `migrations/` folder. The Backend Host validates and executes them when the administrator approves from the UI.
+
+### Difference with setup-database.sql
+
+| File | Purpose | Where it runs | When |
+|------|---------|---------------|------|
+| `setup-database.sql` | Initial setup for local DevHost | Manual (sqlcmd) | Local development |
+| `NNN_*.sql` (migrations) | Schema changes for production | Backend Host (automatic) | Upload + Approve |
+
+### ZIP Structure
+
+```
+myplugin.1.0.0-abc1234.zip
+├── plugin.json
+├── MyPlugin.dll
+├── MyPlugin.deps.json
+├── ... (other DLLs)
+└── migrations/
+    ├── 001_CreateItemsTable.sql
+    ├── 001_CreateItemsTable.rollback.sql
+    ├── 002_CreateProductsTable.sql
+    ├── 002_CreateProductsTable.rollback.sql
+    ├── 003_CreateAuditLogsTable.sql
+    └── 003_CreateAuditLogsTable.rollback.sql
+```
+
+### Naming Conventions
+
+- **Forward:** `NNN_DescriptiveName.sql` (3-digit prefix, PascalCase)
+- **Rollback:** `NNN_DescriptiveName.rollback.sql` (companion, optional but recommended)
+- Example: `004_AddCategoryToProducts.sql` + `004_AddCategoryToProducts.rollback.sql`
+
+### Mandatory Rules
+
+1. **Idempotency**: Scripts MUST use `IF NOT EXISTS`, `IF COL_LENGTH() IS NULL`, etc.
+2. **Batch separator**: Use `GO` as separator (required for CREATE VIEW/TRIGGER)
+3. **Max size**: 1 MB per script, 5 MB total
+4. **Encoding**: UTF-8
+5. **Never modify** an already-applied migration (hash conflict) - create a new numbered script
+
+### Prohibited Patterns (block upload)
+
+The following SQL patterns are rejected by the validator:
+
+| Pattern | Reason |
+|---------|--------|
+| `xp_cmdshell`, `sp_OA*` | OS command execution |
+| `OPENROWSET`, `OPENQUERY`, `OPENDATASOURCE` | Remote data access |
+| `BULK INSERT` | Uncontrolled bulk loading |
+| `CREATE/DROP/ALTER DATABASE` | Database modification |
+| `USE [` | Database context switch |
+| `sp_configure`, `RECONFIGURE` | Server configuration |
+| `CREATE/ALTER ASSEMBLY` | CLR code |
+| `DBCC` | Maintenance commands |
+| `SHUTDOWN` | Server shutdown |
+| `BACKUP/RESTORE` | Backup operations |
+| `CREATE/ALTER LOGIN` | Security management |
+
+### Warning Patterns (don't block, advisory only)
+
+| Pattern | Reason |
+|---------|--------|
+| `DROP TABLE/INDEX/PROCEDURE/VIEW` | Object deletion |
+| `TRUNCATE TABLE` | Mass data deletion |
+| `DELETE FROM` without `WHERE` | Unfiltered deletion |
+| `UPDATE` without `WHERE` | Unfiltered update |
+| `EXEC(`/`sp_executesql` | Dynamic SQL |
+
+### Execution Flow
+
+1. **Upload**: Admin uploads the ZIP with migrations
+2. **Validate**: Backend Host validates all scripts (size, encoding, prohibited patterns, hash)
+3. **Execute** (separate step): Admin approves execution from the UI
+4. **Activate**: Once migrations are executed, the plugin can be activated
+
+### Migration Example
+
+**Forward** (`004_AddCategoryToProducts.sql`):
+```sql
+-- ============================================
+-- Migration: 004_AddCategoryToProducts
+-- Adds Category column to Products table
+-- ============================================
+
+IF COL_LENGTH('Products', 'Category') IS NULL
+BEGIN
+    ALTER TABLE Products ADD Category NVARCHAR(100) NULL;
+    PRINT 'Column Category added to Products';
+END
+GO
+
+-- Add default value for existing rows
+UPDATE Products SET Category = 'General' WHERE Category IS NULL;
+GO
+```
+
+**Rollback** (`004_AddCategoryToProducts.rollback.sql`):
+```sql
+-- ============================================
+-- Rollback: 004_AddCategoryToProducts
+-- Removes Category column from Products table
+-- ============================================
+
+IF COL_LENGTH('Products', 'Category') IS NOT NULL
+BEGIN
+    ALTER TABLE Products DROP COLUMN Category;
+    PRINT 'Column Category removed from Products';
+END
+GO
+```
+
+### Creating a New Migration
+
+1. Choose the next available number (e.g., if the last is `003_`, the new one is `004_`)
+2. Create the forward script: `database/004_MyChange.sql`
+3. Create the rollback script: `database/004_MyChange.rollback.sql`
+4. Verify the script is idempotent
+5. Run `npm run package` to include in the ZIP
 
 ## Create New Feature
 

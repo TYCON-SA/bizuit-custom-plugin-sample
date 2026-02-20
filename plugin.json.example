@@ -19,6 +19,13 @@
   // Set to false if your plugin doesn't need database access
   "requiresDatabase": true,
 
+  // Database migrations (optional)
+  // Enable to include SQL migration scripts from database/ folder in the ZIP
+  // Scripts are validated and executed by Backend Host when admin approves
+  "migrations": {
+    "enabled": true
+  },
+
   // =============================================================================
   // Default Settings (Optional) - FOR CI/CD DEPLOYMENT
   // =============================================================================

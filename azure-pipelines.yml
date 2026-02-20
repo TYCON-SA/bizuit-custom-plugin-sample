@@ -7,6 +7,7 @@ trigger:
       - src/**
       - plugin.json
       - package.json
+      - database/**
 
 pr: none
 
@@ -211,6 +212,24 @@ stages:
             displayName: 'Build and publish plugin'
 
           - script: |
+              echo "Including database migrations in package..."
+              if [ -d "database" ]; then
+                mkdir -p publish/migrations
+                MIGRATION_COUNT=0
+                for f in database/[0-9][0-9][0-9]_*.sql; do
+                  if [ -f "$f" ]; then
+                    cp "$f" publish/migrations/
+                    echo "  + migrations/$(basename "$f")"
+                    MIGRATION_COUNT=$((MIGRATION_COUNT + 1))
+                  fi
+                done
+                echo "Included $MIGRATION_COUNT migration script(s)"
+              else
+                echo "No database/ directory found, skipping migrations"
+              fi
+            displayName: 'Include migrations in package'
+
+          - script: |
               PLUGIN_NAME="$(pluginName)"
               VERSION="$(pluginVersion)"
               SHORT_HASH="$(shortHash)"
@@ -283,7 +302,7 @@ stages:
               # (defaultSettings should only exist in plugin.json.example)
 
               # Create a clean plugin.json with just the essential fields
-              jq '{name, version, description, author, entryPoint, pluginClass}' plugin.version-updated.json > plugin.json
+              jq '{name, version, description, author, entryPoint, pluginClass, requiresDatabase, migrations}' plugin.version-updated.json > plugin.json
 
               # Validate before committing
               if ! jq empty plugin.json 2>/dev/null || [ ! -s plugin.json ]; then

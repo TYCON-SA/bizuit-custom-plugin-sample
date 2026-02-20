@@ -550,6 +550,7 @@ The ZIP structure includes:
 - `plugin.json` (metadata at root)
 - `MyPlugin.dll` (compiled plugin)
 - Dependencies (if any)
+- `migrations/` directory (SQL scripts from `database/`, if `migrations.enabled` is true)
 
 Upload via Backend Host Admin UI or API.
 
@@ -592,6 +593,40 @@ Upload via Backend Host Admin UI or API.
 - **Timestamps**: `CreatedAt` (required), `UpdatedAt` (optional), `DeletedAt` (soft delete)
 - **Audit fields**: `CreatedBy`, `UpdatedBy` stored as usernames (from `BizuitUserContext`)
 - **Table prefix**: Use a unique prefix for your plugin (e.g., `MP_`, `OC_`, `RB_`)
+
+### Database Migration Conventions
+
+Migration scripts in `database/` are automatically included in the deployment ZIP under `migrations/` and executed by Backend Host when the admin approves them.
+
+**Naming:**
+- Forward: `NNN_DescriptiveName.sql` (3-digit prefix, PascalCase)
+- Rollback: `NNN_DescriptiveName.rollback.sql` (companion, optional but recommended)
+- Example: `004_AddCategoryToProducts.sql` + `004_AddCategoryToProducts.rollback.sql`
+
+**Rules:**
+- Scripts MUST be idempotent (`IF NOT EXISTS`, `IF COL_LENGTH() IS NULL`)
+- Use `GO` as batch separator (required for CREATE VIEW/TRIGGER)
+- Max 1 MB per script, 5 MB total
+- UTF-8 encoding
+- NEVER modify an already-applied migration (hash conflict) - create a new numbered script
+
+**Prohibited SQL (blocks upload):**
+`xp_cmdshell`, `sp_OA*`, `OPENROWSET`, `OPENQUERY`, `OPENDATASOURCE`, `BULK INSERT`,
+`CREATE/DROP/ALTER DATABASE`, `USE [`, `sp_configure`, `RECONFIGURE`,
+`CREATE/ALTER ASSEMBLY`, `DBCC`, `SHUTDOWN`, `BACKUP/RESTORE`, `CREATE/ALTER LOGIN`
+
+**Warnings (advisory, doesn't block):**
+`DROP TABLE/INDEX/PROCEDURE/VIEW`, `TRUNCATE TABLE`,
+`DELETE FROM` without `WHERE`, `UPDATE` without `WHERE`, `EXEC(`/`sp_executesql`
+
+**Enable migrations in `plugin.json`:**
+```json
+{
+  "migrations": {
+    "enabled": true
+  }
+}
+```
 
 ## Common Tasks
 
