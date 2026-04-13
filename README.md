@@ -336,7 +336,7 @@ Para debuggear con VS Code, necesitás crear el archivo `.vscode/launch.json`:
       "type": "coreclr",
       "request": "launch",
       "preLaunchTask": "build",
-      "program": "${workspaceFolder}/src/DevHost/bin/Debug/net9.0/DevHost.dll",
+      "program": "${workspaceFolder}/src/DevHost/bin/Debug/net10.0/DevHost.dll",  // Change to net9.0 if targeting net9.0
       "args": [],
       "cwd": "${workspaceFolder}/src/DevHost",
       "stopAtEntry": false,
@@ -1403,7 +1403,7 @@ To debug with VS Code, you need to create the `.vscode/launch.json` file:
       "type": "coreclr",
       "request": "launch",
       "preLaunchTask": "build",
-      "program": "${workspaceFolder}/src/DevHost/bin/Debug/net9.0/DevHost.dll",
+      "program": "${workspaceFolder}/src/DevHost/bin/Debug/net10.0/DevHost.dll",  // Change to net9.0 if targeting net9.0
       "args": [],
       "cwd": "${workspaceFolder}/src/DevHost",
       "stopAtEntry": false,

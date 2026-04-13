@@ -24,8 +24,33 @@ import archiver from 'archiver';
 const ROOT_DIR = process.cwd();
 const PLUGIN_JSON_PATH = join(ROOT_DIR, 'plugin.json');
 const PLUGIN_LOCAL_PATH = join(ROOT_DIR, 'plugin.local.json');
-const PUBLISH_DIR = join(ROOT_DIR, 'src/MyPlugin/bin/Release/net9.0/publish');
 const DIST_DIR = join(ROOT_DIR, 'dist');
+
+/**
+ * Read the TargetFramework from the plugin .csproj file.
+ * Supports both <TargetFramework> (single) and <TargetFrameworks> (multi).
+ * Falls back to 'net9.0' if not found.
+ */
+function detectTargetFramework() {
+    const csprojPath = join(ROOT_DIR, 'src/MyPlugin/MyPlugin.csproj');
+    if (!existsSync(csprojPath)) {
+        console.warn('   Warning: MyPlugin.csproj not found, defaulting to net9.0');
+        return 'net9.0';
+    }
+    const content = readFileSync(csprojPath, 'utf-8');
+    // Match <TargetFramework>net9.0</TargetFramework> or <TargetFrameworks>net9.0;net10.0</TargetFrameworks>
+    const match = content.match(/<TargetFrameworks?>(.*?)<\/TargetFrameworks?>/);
+    if (!match) {
+        console.warn('   Warning: TargetFramework not found in csproj, defaulting to net9.0');
+        return 'net9.0';
+    }
+    // If multi-target, use the last (highest) TFM for publish
+    const tfms = match[1].split(';');
+    return tfms[tfms.length - 1].trim();
+}
+
+const TARGET_FRAMEWORK = detectTargetFramework();
+const PUBLISH_DIR = join(ROOT_DIR, `src/MyPlugin/bin/Release/${TARGET_FRAMEWORK}/publish`);
 
 /**
  * Get git metadata for the current repository
@@ -111,7 +136,8 @@ async function main() {
 
     // Build and publish
     console.log('\n🔨 Building...');
-    execSync('dotnet publish src/MyPlugin/MyPlugin.csproj -c Release -o src/MyPlugin/bin/Release/net9.0/publish', {
+    console.log(`   Target framework: ${TARGET_FRAMEWORK}`);
+    execSync(`dotnet publish src/MyPlugin/MyPlugin.csproj -c Release -f ${TARGET_FRAMEWORK} -o src/MyPlugin/bin/Release/${TARGET_FRAMEWORK}/publish`, {
         cwd: ROOT_DIR,
         stdio: 'inherit'
     });

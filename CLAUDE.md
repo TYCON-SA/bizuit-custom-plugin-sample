@@ -13,7 +13,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a **Bizuit Backend Plugin** template - a .NET 9.0 plugin system for extending Bizuit Backend Host. Plugins are dynamically loaded DLLs that provide REST API endpoints with built-in authentication, automatic transactions, and SQL injection protection via `SafeQueryBuilder`.
+This is a **Bizuit Backend Plugin** template - a .NET 9.0/10.0 plugin system for extending Bizuit Backend Host. Plugins are dynamically loaded DLLs that provide REST API endpoints with built-in authentication, automatic transactions, and SQL injection protection via `SafeQueryBuilder`.
 
 **This is a TEMPLATE project** - when creating a new plugin:
 1. Copy this entire folder
@@ -22,7 +22,7 @@ This is a **Bizuit Backend Plugin** template - a .NET 9.0 plugin system for exte
 4. Choose a table prefix (e.g., `YP_` for YourPlugin)
 
 ### Tech Stack
-- **.NET 9.0** with C# (nullable enabled, implicit usings)
+- **.NET 9.0 / 10.0** with C# (nullable enabled, implicit usings) — change `TargetFramework` in .csproj to switch
 - **Bizuit.Backend.Core** (v1.0.1) - Core plugin framework with SafeQueryBuilder
 - **SQL Server** - Database layer with parameterized queries
 - **Minimal APIs** - Endpoint routing with ASP.NET Core
