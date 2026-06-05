@@ -9,9 +9,9 @@
     "Default": "Server=YOUR_SERVER;Database=YOUR_DATABASE;User Id=YOUR_USER;Password=YOUR_PASSWORD;TrustServerCertificate=True",
 
     // Dashboard: BIZUIT Dashboard database for retrieving user roles and RoleSettings
-    // Used by: DashboardUserService to fetch roles from Users/Roles/RoleSettings tables
+    // Used by: DashboardUserService to fetch roles from Users/UserRoles/Roles/UserRoleSettings tables
     // Required: Always required - DevHost validates encrypted Dashboard tokens
-    // Tables used: Users, Roles, RoleSettings
+    // Tables used: Users, UserRoles, Roles, UserRoleSettings, UserRoleSettingsDefinition
     // Authentication: DevHost decrypts encrypted Dashboard tokens OR accepts plain usernames
     // Example: "Server=your-server.com;Database=YourDashboardDB;User Id=YourUser;Password=YourPassword;TrustServerCertificate=True"
     "Dashboard": "Server=YOUR_DASHBOARD_SERVER;Database=YOUR_DASHBOARD_DATABASE;User Id=YOUR_USER;Password=YOUR_PASSWORD;TrustServerCertificate=True"

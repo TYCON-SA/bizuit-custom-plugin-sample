@@ -338,7 +338,7 @@ Use `NoTransaction` for: logging/auditing, high-frequency writes, operations tha
 
 ### Local Development (DevHost)
 
-The DevHost provides a standalone server for testing with **mock authentication** that simulates Backend Host behavior:
+The DevHost provides a standalone server for testing with **real Dashboard-DB authentication** (the same model as the production Backend Host — no mocks):
 
 ```bash
 # Start development server (http://localhost:5001 + Swagger UI)
@@ -361,54 +361,66 @@ The npm scripts use Linux/macOS syntax and won't work on Windows. Use the provid
 
 These `.bat` files are Windows-specific alternatives to `npm run dev` and `npm run watch`.
 
-#### Mock Authentication System
+#### Authentication (real, against the Dashboard DB)
 
-DevHost uses mock Bearer token authentication to simulate production behavior:
+DevHost does **not** use mocks. It runs a `DevHostBearer` authentication handler
+(`DevHostBearerAuthenticationHandler`) that authenticates exactly like the production
+Backend Host:
 
-**Available Mock Tokens**:
-- `admin` → Roles: Administrators, BizuitAdmins, {PluginName}Admins (full access)
-- `gestor` → Role: Gestores (read/create only)
-- `user` → No roles (authenticated but unauthorized)
+- The Bearer token can be **either** an encrypted real Dashboard token (decrypted by
+  `DashboardTokenService`) **or** a plain username (e.g. `admin`).
+- Roles are **fetched from the Dashboard DB** (`Users` / `UserRoles` / `Roles` /
+  `UserRoleSettings` / `UserRoleSettingsDefinition` tables) via `DashboardUserService` — they
+  are the user's **real** roles, not hardcoded values.
+- The `Dashboard` connection string is **REQUIRED**. If it is missing, DevHost throws at
+  startup: `InvalidOperationException: "Dashboard connection string is required. DevHost needs
+  Dashboard DB to fetch user roles."`.
 
-**Testing with curl**:
+**Testing with curl** (use a username that exists in the Dashboard DB; its real roles are
+loaded from the DB):
 ```bash
-# No auth - Should fail with 403
-curl -X GET 'http://localhost:5001/api/feature'
+# No auth → 403
+curl -X GET 'http://localhost:5001/api/items'
 
-# Admin token - Should succeed
-curl -X GET 'http://localhost:5001/api/feature' \
-  -H 'Authorization: Bearer admin'
+# Authenticate as a real Dashboard user
+curl -X GET 'http://localhost:5001/api/items' -H 'Authorization: Bearer admin'
 
-# Gestor token - Can read/create, cannot delete
-curl -X GET 'http://localhost:5001/api/feature' \
-  -H 'Authorization: Bearer gestor'
-
-curl -X DELETE 'http://localhost:5001/api/feature/1' \
-  -H 'Authorization: Bearer gestor'  # 403 Forbidden
-
-curl -X DELETE 'http://localhost:5001/api/feature/1' \
-  -H 'Authorization: Bearer admin'   # 200 OK or 404
+# A user lacking the required role on a protected endpoint → 403
+curl -X DELETE 'http://localhost:5001/api/products/1' -H 'Authorization: Bearer someuser'
 ```
 
-**Swagger UI Authentication**:
-1. Click "Authorize" button in Swagger UI
-2. Enter token value: `admin`, `gestor`, or `user`
-3. All subsequent requests will include the Bearer token
+**Swagger UI**: click "Authorize" and enter a username that exists in the Dashboard DB; its
+real roles are loaded from the database.
 
-**Important Differences from Production**:
-- DevHost still has **no automatic transactions** - test transaction behavior in Backend Host
-- Mock tokens are simple strings, not real JWTs
-- All mock users belong to "dev-tenant"
-- Production uses real JWT authentication with Azure AD or other identity providers
+**Differences from the Backend Host**:
+- DevHost has **no automatic transactions** — test transactional behavior in the Backend Host.
+- Everything else (token decryption, role/RoleSettings lookup against the Dashboard DB)
+  mirrors production.
 
-Configure connection string in `src/DevHost/appsettings.json`:
+#### DevHost configuration (`appsettings.json` / `appsettings.Development.json`)
+
+Copy the example and fill in your values (`appsettings.Development.json` is gitignored):
+```bash
+cp src/DevHost/appsettings.Development.json.example src/DevHost/appsettings.Development.json
+```
 ```json
 {
   "ConnectionStrings": {
-    "Default": "Server=YOUR_SERVER;Database=YOUR_DB;User Id=USER;Password=PASS;TrustServerCertificate=True"
-  }
+    "Default":   "Server=...;Database=YourPluginDB;...;TrustServerCertificate=True",
+    "Dashboard": "Server=...;Database=YourDashboardDB;...;TrustServerCertificate=True"
+  },
+  "System": {
+    "DashboardApiUrl": "https://YOUR_DASHBOARD/YOUR_TENANT_API/api",
+    "TenantId": "default"
+  },
+  "DevHost": { "EnableSqlLogging": true }
 }
 ```
+- `ConnectionStrings:Default` → your plugin's data DB (Items / Products / …).
+- `ConnectionStrings:Dashboard` → BIZUIT Dashboard DB, **required** for auth (roles / RoleSettings).
+- `System:DashboardApiUrl` / `System:TenantId` → injected by the Backend Host in production; set
+  them here for local dev. Custom plugin settings can also live here and are read via
+  `IConfiguration` (e.g. `configuration["AzureStorageUrl"]`).
 
 ### Building and Testing
 
