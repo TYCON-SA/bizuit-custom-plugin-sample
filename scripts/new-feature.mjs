@@ -220,7 +220,7 @@ public class ${name}Repository : SafeRepository<Models.${singular}>
     /// <summary>
     /// Search ${name.toLowerCase()} with optional filters.
     /// </summary>
-    public async Task<IEnumerable<Models.${singular}>> SearchAsync(string? name, bool? isActive)
+    public virtual async Task<IEnumerable<Models.${singular}>> SearchAsync(string? name, bool? isActive)
     {
         var query = Query();
 
@@ -242,7 +242,7 @@ public class ${name}Repository : SafeRepository<Models.${singular}>
     /// <summary>
     /// Create a new ${singular.toLowerCase()}.
     /// </summary>
-    public async Task<int> CreateAsync(Create${singular}Request request)
+    public virtual async Task<int> CreateAsync(Create${singular}Request request)
     {
         var insert = Insert()
             .Set("Name", request.Name)
@@ -256,7 +256,7 @@ public class ${name}Repository : SafeRepository<Models.${singular}>
     /// <summary>
     /// Update a ${singular.toLowerCase()}.
     /// </summary>
-    public async Task<bool> UpdateAsync(int id, Update${singular}Request request)
+    public virtual async Task<bool> UpdateAsync(int id, Update${singular}Request request)
     {
         var update = Update()
             .Set("Name", request.Name)
@@ -272,7 +272,7 @@ public class ${name}Repository : SafeRepository<Models.${singular}>
     /// <summary>
     /// Get ${singular.toLowerCase()} by ID.
     /// </summary>
-    public async Task<Models.${singular}?> GetByIdAsync(int id)
+    public virtual async Task<Models.${singular}?> GetByIdAsync(int id)
     {
         return await ExecuteSingleAsync(
             Query().WhereEquals("${singular}Id", id));
@@ -281,7 +281,7 @@ public class ${name}Repository : SafeRepository<Models.${singular}>
     /// <summary>
     /// Delete ${singular.toLowerCase()} by ID.
     /// </summary>
-    public async Task<bool> DeleteAsync(int id)
+    public virtual async Task<bool> DeleteAsync(int id)
     {
         var rows = await ExecuteAsync(
             Delete().WhereEquals("${singular}Id", id));
