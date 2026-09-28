@@ -19,7 +19,7 @@
   // =============================================================================
   "System": {
     // DashboardApiUrl: URL of your BIZUIT Dashboard API
-    // Example: "https://test.bizuit.com/YOUR_TENANT_API/api"
+    // Example: "https://YOUR_BIZUIT_HOST/YOUR_TENANT_API/api"
     "DashboardApiUrl": "https://YOUR_DASHBOARD_URL/YOUR_TENANT_API/api",
 
     // TenantId: Your tenant identifier

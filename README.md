@@ -370,7 +370,7 @@ El DevHost usa **autenticación JWT real** igual que en producción. Necesitás 
 
 #### Cómo Obtener un Token JWT
 
-1. **Login al Dashboard**: Ingresá a tu Dashboard de BIZUIT (ej: `https://test.bizuit.com/arielschbizuitdashboard`)
+1. **Login al Dashboard**: Ingresá a tu Dashboard de BIZUIT (ej: `https://your-bizuit-host/your-dashboard`)
 2. **Abrir Developer Tools**: Presioná F12 en tu navegador
 3. **Ir a Storage**:
    - Chrome/Edge: Application → Local Storage
@@ -1437,7 +1437,7 @@ DevHost uses **real JWT token authentication** just like in production. You need
 
 #### How to Get a JWT Token
 
-1. **Login to Dashboard**: Access your BIZUIT Dashboard (e.g., `https://test.bizuit.com/arielschbizuitdashboard`)
+1. **Login to Dashboard**: Access your BIZUIT Dashboard (e.g., `https://your-bizuit-host/your-dashboard`)
 2. **Open Developer Tools**: Press F12 in your browser
 3. **Go to Storage**:
    - Chrome/Edge: Application → Local Storage

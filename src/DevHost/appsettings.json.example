@@ -33,7 +33,7 @@
     // TenantId: Identifier for multi-tenant scenarios
     // Used by: Backend Host to isolate configuration and data per tenant
     // Default: "default" (single-tenant)
-    // Multi-tenant examples: "tenant1", "customer-abc", "arielsch", "recubiz"
+    // Multi-tenant examples: "tenant1", "customer-abc", "acme-corp"
     // Access in plugin: configuration["System:TenantId"]
     "TenantId": "default"
   },

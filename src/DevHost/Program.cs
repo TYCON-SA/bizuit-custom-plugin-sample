@@ -238,6 +238,35 @@ public class DevHostEndpointBuilder : IPluginEndpointBuilder
     public IEndpointConventionBuilder MapDelete(string pattern, Delegate handler)
         => RegisterEndpoint(_app.MapDelete($"/api/{pattern}", handler));
 
+    /// <summary>
+    /// Maps a plugin SignalR hub. Available since Bizuit.Backend.Abstractions 1.1.0.
+    ///
+    /// The `/api/` prefix matches the other endpoints so the local route mirrors the real host.
+    /// Unlike the other Map* methods, a hub carries no plugin authorization conventions:
+    /// authentication is resolved inside the Hub itself.
+    /// </summary>
+    public void MapHub<THub>(string pattern) where THub : class
+    {
+        // The host interface declares `where THub : class`, but ASP.NET's MapHub requires
+        // `where THub : Hub`. A constraint cannot be relaxed, so it is resolved by reflection —
+        // validating first, to fail with a readable message instead of a reflection exception.
+        if (!typeof(Microsoft.AspNetCore.SignalR.Hub).IsAssignableFrom(typeof(THub)))
+        {
+            throw new InvalidOperationException(
+                $"{typeof(THub).Name} does not inherit from Hub: it cannot be mapped as a SignalR hub.");
+        }
+
+        var mapHub = typeof(HubEndpointRouteBuilderExtensions)
+            .GetMethods()
+            .First(m => m.Name == nameof(HubEndpointRouteBuilderExtensions.MapHub)
+                        && m.IsGenericMethodDefinition
+                        && m.GetParameters().Length == 2)
+            .MakeGenericMethod(typeof(THub));
+
+        mapHub.Invoke(null, new object[] { _app, $"/api/{pattern}" });
+        Console.WriteLine($"[DevHost] SignalR hub mapped: /api/{pattern} ({typeof(THub).Name})");
+    }
+
     public IEndpointConventionBuilder MapPatch(string pattern, Delegate handler)
         => RegisterEndpoint(_app.MapPatch($"/api/{pattern}", handler));
 
