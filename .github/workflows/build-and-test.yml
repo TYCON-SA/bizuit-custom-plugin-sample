@@ -1,0 +1,48 @@
+# Builds the template and runs its tests against the CURRENT published packages.
+#
+# 🔴 WHY THIS EXISTS. Until 2026-09-28 the only workflow here packaged the plugin — it never
+# compiled the DevHost or ran the tests. So when a newer `Bizuit.Backend.Abstractions` added a
+# member to `IPluginEndpointBuilder`, this template silently stopped compiling and nobody found
+# out until someone started a new plugin from it, weeks later.
+#
+# A template that is not built is not a template: it is a snapshot of a day that has passed.
+#
+# The nightly run is the point: the packages move on their own, so "it compiled when we last
+# touched it" is not the same as "it compiles today".
+
+name: Build and test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    # Every day at 06:00 UTC — catches a package that broke the template without any commit here.
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          # 🔴 Must match the TargetFramework of the .csproj files. Moving the template to a newer
+          # framework means changing FOUR things: the three .csproj and this line. Missing this one
+          # fails with NETSDK1045 ("the current .NET SDK does not support targeting .NET X"), which
+          # never reproduces on a developer machine that has the newer SDK installed.
+          dotnet-version: '10.0.x'
+
+      - name: Restore
+        run: dotnet restore MyPlugin.sln
+
+      - name: Build
+        run: dotnet build MyPlugin.sln --no-restore --configuration Release
+
+      - name: Test
+        run: dotnet test tests/MyPlugin.Tests/MyPlugin.Tests.csproj --no-build --configuration Release --verbosity normal

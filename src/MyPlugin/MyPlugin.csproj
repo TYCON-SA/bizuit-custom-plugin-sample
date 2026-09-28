@@ -1,18 +1,27 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net9.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <AssemblyName>MyPlugin</AssemblyName>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Bizuit.Backend.Core" Version="1.0.12" />
+    <!-- 🔴 BOTH pinned on purpose. Pinning only Core lets Abstractions float to a newer
+         version whose interface has members the DevHost does not implement, and the template
+         stops compiling without anyone noticing. That is exactly what happened before 2026-09-28. -->
+    <PackageReference Include="Bizuit.Backend.Abstractions" Version="1.2.0" />
+    <PackageReference Include="Bizuit.Backend.Core" Version="1.1.0" />
   </ItemGroup>
 
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Tests can see internal types: see the comment on MeEndpoints.GetMe. -->
+    <InternalsVisibleTo Include="MyPlugin.Tests" />
   </ItemGroup>
 
 </Project>

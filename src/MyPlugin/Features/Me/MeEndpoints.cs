@@ -18,8 +18,13 @@ public static class MeEndpoints
 
     /// <summary>
     /// Returns ALL information about the authenticated user.
+    ///
+    /// `internal` rather than `private` on purpose: this is the only body with logic that
+    /// survives when a new product deletes the example features, and if tests cannot call it the
+    /// new product starts at 0% coverage — which blocks every pull request until its first
+    /// feature exists. (Learned the hard way on 2026-09-28.)
     /// </summary>
-    private static Task<IResult> GetMe(BizuitUserContext user, HttpContext httpContext)
+    internal static Task<IResult> GetMe(BizuitUserContext user, HttpContext httpContext)
     {
         var info = new
         {
