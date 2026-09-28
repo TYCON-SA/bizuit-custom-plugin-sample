@@ -59,8 +59,19 @@ jobs:
       - name: Calculate version
         id: version
         run: |
-          # Pull latest changes to get version commits (they have [skip ci] so won't be in checkout)
-          git pull origin main --rebase || true
+          # 🔴 THE VERSION NO LONGER COMES FROM A COMMIT ON MAIN. It used to: this workflow
+          # incremented the patch, committed plugin.json back to main and pushed. That made the
+          # packaging job a writer on the default branch — so protecting `main` (pull request
+          # required, status check required) broke packaging outright, and the only ways out were
+          # to weaken the protection or to hand a bypass token to the robot.
+          #
+          # Neither is worth it for a sample repository: there are no releases to track here, just
+          # an example ZIP. MAJOR.MINOR still come from plugin.json (a human decides those); PATCH
+          # is the run number, which is monotonic and needs nobody's write access.
+          #
+          # Consequence, said out loud: the version in plugin.json on main stays at its MAJOR.MINOR
+          # and does not track what was packaged. The packaged ZIP and the release tag carry the
+          # full version.
 
           # Validate plugin.json is valid JSON before proceeding
           echo "📋 Validating plugin.json..."
@@ -94,11 +105,10 @@ jobs:
               NEW_VERSION="1.0.0"
               echo "Invalid or missing version! Starting at v1.0.0"
             else
-              # Increment PATCH from current version
+              # PATCH = run number: monotonic, and it needs no write access to the branch.
               IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT_VERSION"
-              PATCH=$((PATCH + 1))
-              NEW_VERSION="$MAJOR.$MINOR.$PATCH"
-              echo "Auto-increment: $CURRENT_VERSION -> $NEW_VERSION"
+              NEW_VERSION="$MAJOR.$MINOR.${{ github.run_number }}"
+              echo "Version from run number: $CURRENT_VERSION -> $NEW_VERSION"
             fi
           fi
 
@@ -307,47 +317,6 @@ jobs:
           name: ${{ steps.plugin_meta.outputs.name }}-${{ steps.version.outputs.version }}
           path: dist/*.zip
           retention-days: 90
-
-      - name: Commit version update
-        run: |
-          echo "📝 Committing version update..."
-
-          # IMPORTANT: Restore the ORIGINAL plugin.json structure before committing
-          # We need to commit plugin.json with the new version but WITHOUT defaultSettings
-          # (defaultSettings should only exist in plugin.json.example)
-
-          # Create a clean plugin.json with just the essential fields
-          jq '{name, version, description, author, entryPoint, pluginClass, requiresDatabase, migrations}' plugin.version-updated.json > plugin.json
-
-          # Validate before committing
-          if ! jq empty plugin.json 2>/dev/null || [ ! -s plugin.json ]; then
-            echo "❌ ERROR: plugin.json is invalid before commit!"
-            cat plugin.json
-            exit 1
-          fi
-
-          echo "📋 plugin.json to commit:"
-          cat plugin.json
-
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-
-          git add plugin.json
-
-          if git diff --staged --quiet; then
-            echo "⚠️ No version changes to commit"
-          else
-            git commit -m "chore: bump version to ${{ steps.version.outputs.version }} [skip ci]"
-
-            echo "📤 Pushing changes to repository..."
-
-            if git push; then
-              echo "✅ Version update committed and pushed successfully"
-            else
-              echo "❌ Failed to push changes"
-              exit 1
-            fi
-          fi
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
