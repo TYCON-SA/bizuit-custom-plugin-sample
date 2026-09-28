@@ -159,10 +159,16 @@ jobs:
 
           # Copy plugin.json.example as base (without credentials)
           if [ -f "plugin.json.example" ]; then
-            # Validate plugin.json.example is valid JSON
-            if jq empty plugin.json.example 2>/dev/null; then
-              cp plugin.json.example plugin.json
-              echo "✅ Copied plugin.json.example → plugin.json"
+            # 🔴 plugin.json.example carries `//` comments ON PURPOSE: it is the documented
+            # manifest, the first thing someone reads when starting a plugin. That makes it JSONC,
+            # not JSON, so `jq empty` rejected it and this workflow had been failing on every push
+            # to main — silently, because nothing else here runs.
+            # The comment lines are stripped before validating and copying: the host parses the
+            # real plugin.json, and that one must be strict JSON.
+            grep -vE '^[[:space:]]*//' plugin.json.example > plugin.json.stripped
+            if jq empty plugin.json.stripped 2>/dev/null; then
+              mv plugin.json.stripped plugin.json
+              echo "✅ Copied plugin.json.example → plugin.json (comments stripped)"
             else
               echo "❌ ERROR: plugin.json.example is not valid JSON!"
               cat plugin.json.example
