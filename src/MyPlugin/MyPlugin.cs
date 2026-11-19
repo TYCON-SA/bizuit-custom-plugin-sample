@@ -6,7 +6,6 @@ using MyPlugin.Features.Items;  // example-feature
 using MyPlugin.Features.Products;  // example-feature
 using MyPlugin.Features.AuditLogs;  // example-feature
 using MyPlugin.Features.Me;
-using MyPlugin.Shared;
 
 namespace MyPlugin;
 
@@ -65,13 +64,12 @@ public class MyPluginPlugin : IBackendPlugin
         // Feature: AuditLogs ([NoTransaction] endpoints)  // example-feature
         services.AddScoped<AuditLogsRepository>();  // example-feature
 
-        // Shared: Plugin Logger (writes to BZExtPluginLogs table)
-        // IMPORTANT: Use factory delegate because IConfiguration is NOT available via DI in Backend Host!
+        // IMPORTANT: IConfiguration is NOT available via DI in the Backend Host. A service that
+        // needs configuration is registered with a factory delegate that passes the `configuration`
+        // of this method:
+        //     services.AddSingleton<MyService>(sp => new MyService(configuration));
+        // `services.AddSingleton<MyService>()` would fail at runtime when DI tries to resolve it.
         // See README.md section "IConfiguration is NOT available via DI" for details.
-        services.AddSingleton<PluginLogger>(sp =>
-        {
-            return new PluginLogger(configuration);  // Pass configuration from this scope
-        });
     }
 
     public void ConfigureEndpoints(IPluginEndpointBuilder endpoints)

@@ -80,14 +80,18 @@ public class SkeletonTests
     }
 
     [Fact]
-    public void ConfigureServices_registers_the_plugin_logger()
+    public void ConfigureServices_registers_the_database_core_only_when_the_host_provides_a_connection_string()
     {
-        var services = new ServiceCollection();
+        // A product can start without a database: with no connection string nothing of the
+        // database is registered; with one, the Bizuit Backend Core services are.
+        var withoutDb = new ServiceCollection();
+        new MyPluginPlugin().ConfigureServices(withoutDb, Config());
 
-        new MyPluginPlugin().ConfigureServices(services, Config(
+        var withDb = new ServiceCollection();
+        new MyPluginPlugin().ConfigureServices(withDb, Config(
             ("ConnectionStrings:Default", "Server=localhost;Database=sample;Integrated Security=True;")));
 
-        Assert.Contains(services, s => s.ServiceType == typeof(Shared.PluginLogger));
+        Assert.True(withDb.Count > withoutDb.Count);
     }
 
     [Fact]
@@ -150,6 +154,21 @@ public class SkeletonTests
         // Holds one of the two, not both: `any` yes, `all` no.
         Assert.Equal(true, Read(checks, "hasAnyAdmin"));
         Assert.Equal(false, Read(checks, "hasAllAdmins"));
+    }
+
+    [Fact]
+    public async Task GetMe_lists_the_claims_of_the_principal_when_the_host_provides_one()
+    {
+        var user = TestUser();
+        user.Principal = new System.Security.Claims.ClaimsPrincipal(new System.Security.Claims.ClaimsIdentity(
+            new[] { new System.Security.Claims.Claim("sub", "jane.doe", null, "test-issuer") }, "test"));
+
+        var result = await MeEndpoints.GetMe(user, TestRequest());
+
+        var claims = ((System.Collections.IEnumerable)Read(BodyOf(result), "principalClaims")!).Cast<object>().ToList();
+        Assert.Single(claims);
+        Assert.Equal("sub", Read(claims[0], "type"));
+        Assert.Equal("test-issuer", Read(claims[0], "issuer"));
     }
 
     [Fact]
