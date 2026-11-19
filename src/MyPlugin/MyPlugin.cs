@@ -2,9 +2,9 @@ using Bizuit.Backend.Abstractions;
 using Bizuit.Backend.Core.Extensions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using MyPlugin.Features.Items;
-using MyPlugin.Features.Products;
-using MyPlugin.Features.AuditLogs;
+using MyPlugin.Features.Items;  // example-feature
+using MyPlugin.Features.Products;  // example-feature
+using MyPlugin.Features.AuditLogs;  // example-feature
 using MyPlugin.Features.Me;
 using MyPlugin.Shared;
 
@@ -12,11 +12,10 @@ namespace MyPlugin;
 
 /// <summary>
 /// Main plugin class - entry point for the Backend Host.
-///
-/// This template demonstrates:
-/// - Items: Public CRUD endpoints (no authentication)
-/// - Products: Protected CRUD endpoints (requires auth, admin for delete)
-/// - AuditLogs: [NoTransaction] endpoints for fire-and-forget logging
+/// Example features, removed by scripts/remove-examples.mjs when a product starts from this template:  // example-feature
+/// - Items: Public CRUD endpoints (no authentication)  // example-feature
+/// - Products: Protected CRUD endpoints (requires auth, admin for delete)  // example-feature
+/// - AuditLogs: [NoTransaction] endpoints for fire-and-forget logging  // example-feature
 /// </summary>
 public class MyPluginPlugin : IBackendPlugin
 {
@@ -55,16 +54,16 @@ public class MyPluginPlugin : IBackendPlugin
             });
         }
 
-        // Feature: Items (public CRUD)
-        services.AddScoped<ItemsService>();
-        services.AddScoped<ItemsRepository>();
+        // Feature: Items (public CRUD)  // example-feature
+        services.AddScoped<ItemsService>();  // example-feature
+        services.AddScoped<ItemsRepository>();  // example-feature
 
-        // Feature: Products (protected CRUD with auth)
-        services.AddScoped<ProductsService>();
-        services.AddScoped<ProductsRepository>();
+        // Feature: Products (protected CRUD with auth)  // example-feature
+        services.AddScoped<ProductsService>();  // example-feature
+        services.AddScoped<ProductsRepository>();  // example-feature
 
-        // Feature: AuditLogs ([NoTransaction] endpoints)
-        services.AddScoped<AuditLogsRepository>();
+        // Feature: AuditLogs ([NoTransaction] endpoints)  // example-feature
+        services.AddScoped<AuditLogsRepository>();  // example-feature
 
         // Shared: Plugin Logger (writes to BZExtPluginLogs table)
         // IMPORTANT: Use factory delegate because IConfiguration is NOT available via DI in Backend Host!
@@ -77,17 +76,17 @@ public class MyPluginPlugin : IBackendPlugin
 
     public void ConfigureEndpoints(IPluginEndpointBuilder endpoints)
     {
-        // Feature: Items - Public endpoints (no auth required)
-        // GET/POST/PUT/DELETE /items
-        ItemsEndpoints.Map(endpoints);
+        // Feature: Items - Public endpoints (no auth required)  // example-feature
+        // GET/POST/PUT/DELETE /items  // example-feature
+        ItemsEndpoints.Map(endpoints);  // example-feature
 
-        // Feature: Products - Protected endpoints
-        // GET: public, POST/PUT: requires auth, DELETE: requires admin
-        ProductsEndpoints.Map(endpoints);
+        // Feature: Products - Protected endpoints  // example-feature
+        // GET: public, POST/PUT: requires auth, DELETE: requires admin  // example-feature
+        ProductsEndpoints.Map(endpoints);  // example-feature
 
-        // Feature: AuditLogs - [NoTransaction] endpoints
-        // POST endpoints do NOT use transactions (fire-and-forget)
-        AuditLogsEndpoints.Map(endpoints);
+        // Feature: AuditLogs - [NoTransaction] endpoints  // example-feature
+        // POST endpoints do NOT use transactions (fire-and-forget)  // example-feature
+        AuditLogsEndpoints.Map(endpoints);  // example-feature
 
         // Feature: Me - Debug endpoint for user context
         // GET /me - returns ALL user information

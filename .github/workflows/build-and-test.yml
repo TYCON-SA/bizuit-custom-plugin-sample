@@ -46,3 +46,93 @@ jobs:
 
       - name: Test
         run: dotnet test tests/MyPlugin.Tests/MyPlugin.Tests.csproj --no-build --configuration Release --verbosity normal
+
+  # 🔴 WHY THIS SECOND JOB EXISTS (2026-11-19). The job above tests the template WITH its example
+  # features. No product ever ships them: the onboarding removes them. So that job could be green
+  # while the skeleton a product actually starts from failed the product pipeline. That happened
+  # on a real onboarding: the first pull request of the new product stopped on a vulnerable
+  # transitive package and on coverage below 70 %, both inherited from here.
+  #
+  # This job checks the skeleton with the SAME gates as a product pipeline:
+  #   - it removes the examples with the same script the onboarding uses;
+  #   - it scans dependencies with the harness script the product pipeline runs (it reports red
+  #     when it could not measure, and treats an unknown severity as high);
+  #   - it enforces the same 70 % floor on lines and branches, measured the same way.
+  # Nothing is committed: the removal lives and dies inside the runner.
+  skeleton-gates:
+    name: Skeleton gates (dependency scan + 70 % coverage)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Fetch the harness (public, no credentials)
+        # Same source the product pipelines use. If the clone fails the job fails: a gate that
+        # could not run is not a gate that passed.
+        run: |
+          set -euo pipefail
+          git clone --quiet --depth 1 --single-branch --branch main --no-tags \
+            https://github.com/TYCON-SA/tycon-harness.git "$RUNNER_TEMP/tcg"
+          echo "Harness at $(git -C "$RUNNER_TEMP/tcg" rev-parse --short HEAD)"
+
+      - name: Remove the example features (as the onboarding does)
+        id: strip
+        run: node scripts/remove-examples.mjs
+
+      - name: Dependency scan (same criterion as the product pipeline)
+        run: |
+          set -u
+          node "$RUNNER_TEMP/tcg/scripts/ci/audit-dependencies.js" \
+            --repo . --type nuget --project src/MyPlugin/MyPlugin.csproj --block
+          RC=$?
+          if [ "$RC" -eq 2 ]; then
+            echo "::error::The dependency scan could not measure — it cannot be taken as clean"
+            exit 1
+          elif [ "$RC" -ne 0 ]; then
+            echo "::error::High or critical vulnerable packages in the skeleton — every new product would inherit them"
+            exit 1
+          fi
+
+      - name: Test with coverage
+        # Runs even when the scan failed, so one red run reports both problems.
+        if: ${{ !cancelled() && steps.strip.outcome == 'success' }}
+        run: |
+          dotnet test tests/MyPlugin.Tests/MyPlugin.Tests.csproj \
+            --collect:"XPlat Code Coverage" \
+            --results-directory "$RUNNER_TEMP/TestResults" \
+            --verbosity minimal \
+            -- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Exclude="[DevHost]*"
+
+      - name: Enforce the 70 % coverage floor (lines and branches)
+        if: ${{ !cancelled() && steps.strip.outcome == 'success' }}
+        run: |
+          set -euo pipefail
+          dotnet tool install -g dotnet-reportgenerator-globaltool --version 5.5.11
+          REPORTS=$(find "$RUNNER_TEMP/TestResults" -name coverage.cobertura.xml -type f | sort | paste -sd ';' -)
+          if [ -z "$REPORTS" ]; then
+            echo "::error::No coverage.cobertura.xml found — coverage could not be measured, the floor is not passed"
+            exit 1
+          fi
+          reportgenerator -reports:"$REPORTS" -targetdir:"$RUNNER_TEMP/CoverageReport" -reporttypes:TextSummary
+          cat "$RUNNER_TEMP/CoverageReport/Summary.txt"
+          LINE=$(grep 'Line coverage:' "$RUNNER_TEMP/CoverageReport/Summary.txt" | grep -oE '[0-9]+\.?[0-9]*' | head -1)
+          BRANCH=$(grep 'Branch coverage:' "$RUNNER_TEMP/CoverageReport/Summary.txt" | grep -oE '[0-9]+\.?[0-9]*' | head -1)
+          if [ -z "$LINE" ] || [ -z "$BRANCH" ]; then
+            echo "::error::Could not read coverage from Summary.txt (lines='$LINE' branches='$BRANCH')"
+            exit 1
+          fi
+          echo "Skeleton coverage: ${LINE}% lines, ${BRANCH}% branches (floor 70 / 70)"
+          FAILED=0
+          if awk -v v="$LINE" 'BEGIN{exit !(v<70)}'; then echo "::error::Line coverage ${LINE}% is below 70%"; FAILED=1; fi
+          if awk -v v="$BRANCH" 'BEGIN{exit !(v<70)}'; then echo "::error::Branch coverage ${BRANCH}% is below 70%"; FAILED=1; fi
+          exit $FAILED
