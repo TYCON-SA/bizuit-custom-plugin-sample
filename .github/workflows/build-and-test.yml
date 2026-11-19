@@ -92,9 +92,11 @@ jobs:
       - name: Dependency scan (same criterion as the product pipeline)
         run: |
           set -u
+          # `|| RC=$?`: GitHub runs steps with `bash -e`, which would exit before telling "could not
+          # measure" (2) apart from "vulnerable" (1).
+          RC=0
           node "$RUNNER_TEMP/tcg/scripts/ci/audit-dependencies.js" \
-            --repo . --type nuget --project src/MyPlugin/MyPlugin.csproj --block
-          RC=$?
+            --repo . --type nuget --project src/MyPlugin/MyPlugin.csproj --block || RC=$?
           if [ "$RC" -eq 2 ]; then
             echo "::error::The dependency scan could not measure — it cannot be taken as clean"
             exit 1
